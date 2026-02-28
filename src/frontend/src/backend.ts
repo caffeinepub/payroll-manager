@@ -89,203 +89,293 @@ export class ExternalBlob {
         return this;
     }
 }
-export interface PayrollEntry {
-    id: string;
-    tipsEarned: number;
-    hoursWorked: number;
-    employeeId: string;
-    isStudent: boolean;
-    totalWages: number;
-}
 export interface Employee {
     id: string;
     name: string;
     wageRate: number;
 }
-export interface backendInterface {
-    clearPayrollEntries(): Promise<void>;
-    createEmployee(id: string, name: string, wageRate: number): Promise<void>;
-    createPayrollEntry(id: string, employeeId: string, hoursWorked: number, tipsEarned: number, isStudent: boolean): Promise<void>;
-    deleteEmployee(id: string): Promise<void>;
-    deletePayrollEntry(id: string): Promise<void>;
-    getEmployee(id: string): Promise<Employee>;
-    getPayrollEntriesByEmployee(employeeId: string): Promise<Array<PayrollEntry>>;
-    getPayrollEntry(id: string): Promise<PayrollEntry>;
-    listEmployees(): Promise<Array<Employee>>;
-    listPayrollEntries(): Promise<Array<PayrollEntry>>;
-    updateEmployee(id: string, name: string, wageRate: number): Promise<void>;
-    updatePayrollEntry(id: string, employeeId: string, hoursWorked: number, tipsEarned: number, isStudent: boolean): Promise<void>;
+export interface PayrollEntry {
+    id: string;
+    tipsEarned: number;
+    paymentMethod: string;
+    fixedSalaryAmount: number;
+    isFixedSalary: boolean;
+    hoursWorked: number;
+    overtimeWageRate: number;
+    employeeId: string;
+    overtimePaymentMethod: string;
+    isStudent: boolean;
+    totalWages: number;
+    overtimeTotal: number;
+    overtimeHours: number;
 }
+export interface WeeklyTotals {
+    tipTotal: number;
+    grandTotal: number;
+    wageTotal: number;
+    overtimeTotal: number;
+}
+export interface PayPeriod {
+    id: string;
+    endDate: string;
+    cashTotal: number;
+    employeeCount: bigint;
+    createdAt: bigint;
+    totalTips: number;
+    _label: string;
+    grandTotal: number;
+    totalWages: number;
+    overtimeTotal: number;
+    startDate: string;
+}
+export interface backendInterface {
+    calculateWeeklyTotals(companyId: string): Promise<WeeklyTotals>;
+    clearPayrollEntries(companyId: string): Promise<void>;
+    createEmployee(companyId: string, id: string, name: string, wageRate: number): Promise<void>;
+    createPayrollEntry(companyId: string, id: string, employeeId: string, hoursWorked: number, tipsEarned: number, isStudent: boolean, overtimeHours: number, overtimeWageRate: number, isFixedSalary: boolean, fixedSalaryAmount: number, paymentMethod: string, overtimePaymentMethod: string): Promise<void>;
+    deleteEmployee(companyId: string, id: string): Promise<void>;
+    deletePayrollEntry(companyId: string, id: string): Promise<void>;
+    getEmployee(companyId: string, id: string): Promise<Employee>;
+    getLatestPayPeriod(companyId: string): Promise<PayPeriod | null>;
+    getPayrollEntriesByEmployee(companyId: string, employeeId: string): Promise<Array<PayrollEntry>>;
+    getPayrollEntry(companyId: string, id: string): Promise<PayrollEntry>;
+    listEmployees(companyId: string): Promise<Array<Employee>>;
+    listPayPeriods(companyId: string): Promise<Array<PayPeriod>>;
+    listPayrollEntries(companyId: string): Promise<Array<PayrollEntry>>;
+    savePayPeriod(companyId: string, id: string, startDate: string, endDate: string, _label: string, totalWages: number, totalTips: number, overtimeTotal: number, grandTotal: number, cashTotal: number, employeeCount: bigint): Promise<void>;
+    updateEmployee(companyId: string, id: string, name: string, wageRate: number): Promise<void>;
+    updatePayrollEntry(companyId: string, id: string, employeeId: string, hoursWorked: number, tipsEarned: number, isStudent: boolean, overtimeHours: number, overtimeWageRate: number, isFixedSalary: boolean, fixedSalaryAmount: number, paymentMethod: string, overtimePaymentMethod: string): Promise<void>;
+}
+import type { PayPeriod as _PayPeriod } from "./declarations/backend.did.d.ts";
 export class Backend implements backendInterface {
     constructor(private actor: ActorSubclass<_SERVICE>, private _uploadFile: (file: ExternalBlob) => Promise<Uint8Array>, private _downloadFile: (file: Uint8Array) => Promise<ExternalBlob>, private processError?: (error: unknown) => never){}
-    async clearPayrollEntries(): Promise<void> {
+    async calculateWeeklyTotals(arg0: string): Promise<WeeklyTotals> {
         if (this.processError) {
             try {
-                const result = await this.actor.clearPayrollEntries();
+                const result = await this.actor.calculateWeeklyTotals(arg0);
                 return result;
             } catch (e) {
                 this.processError(e);
                 throw new Error("unreachable");
             }
         } else {
-            const result = await this.actor.clearPayrollEntries();
+            const result = await this.actor.calculateWeeklyTotals(arg0);
             return result;
         }
     }
-    async createEmployee(arg0: string, arg1: string, arg2: number): Promise<void> {
+    async clearPayrollEntries(arg0: string): Promise<void> {
         if (this.processError) {
             try {
-                const result = await this.actor.createEmployee(arg0, arg1, arg2);
+                const result = await this.actor.clearPayrollEntries(arg0);
                 return result;
             } catch (e) {
                 this.processError(e);
                 throw new Error("unreachable");
             }
         } else {
-            const result = await this.actor.createEmployee(arg0, arg1, arg2);
+            const result = await this.actor.clearPayrollEntries(arg0);
             return result;
         }
     }
-    async createPayrollEntry(arg0: string, arg1: string, arg2: number, arg3: number, arg4: boolean): Promise<void> {
+    async createEmployee(arg0: string, arg1: string, arg2: string, arg3: number): Promise<void> {
         if (this.processError) {
             try {
-                const result = await this.actor.createPayrollEntry(arg0, arg1, arg2, arg3, arg4);
+                const result = await this.actor.createEmployee(arg0, arg1, arg2, arg3);
                 return result;
             } catch (e) {
                 this.processError(e);
                 throw new Error("unreachable");
             }
         } else {
-            const result = await this.actor.createPayrollEntry(arg0, arg1, arg2, arg3, arg4);
+            const result = await this.actor.createEmployee(arg0, arg1, arg2, arg3);
             return result;
         }
     }
-    async deleteEmployee(arg0: string): Promise<void> {
+    async createPayrollEntry(arg0: string, arg1: string, arg2: string, arg3: number, arg4: number, arg5: boolean, arg6: number, arg7: number, arg8: boolean, arg9: number, arg10: string, arg11: string): Promise<void> {
         if (this.processError) {
             try {
-                const result = await this.actor.deleteEmployee(arg0);
+                const result = await this.actor.createPayrollEntry(arg0, arg1, arg2, arg3, arg4, arg5, arg6, arg7, arg8, arg9, arg10, arg11);
                 return result;
             } catch (e) {
                 this.processError(e);
                 throw new Error("unreachable");
             }
         } else {
-            const result = await this.actor.deleteEmployee(arg0);
+            const result = await this.actor.createPayrollEntry(arg0, arg1, arg2, arg3, arg4, arg5, arg6, arg7, arg8, arg9, arg10, arg11);
             return result;
         }
     }
-    async deletePayrollEntry(arg0: string): Promise<void> {
+    async deleteEmployee(arg0: string, arg1: string): Promise<void> {
         if (this.processError) {
             try {
-                const result = await this.actor.deletePayrollEntry(arg0);
+                const result = await this.actor.deleteEmployee(arg0, arg1);
                 return result;
             } catch (e) {
                 this.processError(e);
                 throw new Error("unreachable");
             }
         } else {
-            const result = await this.actor.deletePayrollEntry(arg0);
+            const result = await this.actor.deleteEmployee(arg0, arg1);
             return result;
         }
     }
-    async getEmployee(arg0: string): Promise<Employee> {
+    async deletePayrollEntry(arg0: string, arg1: string): Promise<void> {
         if (this.processError) {
             try {
-                const result = await this.actor.getEmployee(arg0);
+                const result = await this.actor.deletePayrollEntry(arg0, arg1);
                 return result;
             } catch (e) {
                 this.processError(e);
                 throw new Error("unreachable");
             }
         } else {
-            const result = await this.actor.getEmployee(arg0);
+            const result = await this.actor.deletePayrollEntry(arg0, arg1);
             return result;
         }
     }
-    async getPayrollEntriesByEmployee(arg0: string): Promise<Array<PayrollEntry>> {
+    async getEmployee(arg0: string, arg1: string): Promise<Employee> {
         if (this.processError) {
             try {
-                const result = await this.actor.getPayrollEntriesByEmployee(arg0);
+                const result = await this.actor.getEmployee(arg0, arg1);
                 return result;
             } catch (e) {
                 this.processError(e);
                 throw new Error("unreachable");
             }
         } else {
-            const result = await this.actor.getPayrollEntriesByEmployee(arg0);
+            const result = await this.actor.getEmployee(arg0, arg1);
             return result;
         }
     }
-    async getPayrollEntry(arg0: string): Promise<PayrollEntry> {
+    async getLatestPayPeriod(arg0: string): Promise<PayPeriod | null> {
         if (this.processError) {
             try {
-                const result = await this.actor.getPayrollEntry(arg0);
+                const result = await this.actor.getLatestPayPeriod(arg0);
+                return from_candid_opt_n1(this._uploadFile, this._downloadFile, result);
+            } catch (e) {
+                this.processError(e);
+                throw new Error("unreachable");
+            }
+        } else {
+            const result = await this.actor.getLatestPayPeriod(arg0);
+            return from_candid_opt_n1(this._uploadFile, this._downloadFile, result);
+        }
+    }
+    async getPayrollEntriesByEmployee(arg0: string, arg1: string): Promise<Array<PayrollEntry>> {
+        if (this.processError) {
+            try {
+                const result = await this.actor.getPayrollEntriesByEmployee(arg0, arg1);
                 return result;
             } catch (e) {
                 this.processError(e);
                 throw new Error("unreachable");
             }
         } else {
-            const result = await this.actor.getPayrollEntry(arg0);
+            const result = await this.actor.getPayrollEntriesByEmployee(arg0, arg1);
             return result;
         }
     }
-    async listEmployees(): Promise<Array<Employee>> {
+    async getPayrollEntry(arg0: string, arg1: string): Promise<PayrollEntry> {
         if (this.processError) {
             try {
-                const result = await this.actor.listEmployees();
+                const result = await this.actor.getPayrollEntry(arg0, arg1);
                 return result;
             } catch (e) {
                 this.processError(e);
                 throw new Error("unreachable");
             }
         } else {
-            const result = await this.actor.listEmployees();
+            const result = await this.actor.getPayrollEntry(arg0, arg1);
             return result;
         }
     }
-    async listPayrollEntries(): Promise<Array<PayrollEntry>> {
+    async listEmployees(arg0: string): Promise<Array<Employee>> {
         if (this.processError) {
             try {
-                const result = await this.actor.listPayrollEntries();
+                const result = await this.actor.listEmployees(arg0);
                 return result;
             } catch (e) {
                 this.processError(e);
                 throw new Error("unreachable");
             }
         } else {
-            const result = await this.actor.listPayrollEntries();
+            const result = await this.actor.listEmployees(arg0);
             return result;
         }
     }
-    async updateEmployee(arg0: string, arg1: string, arg2: number): Promise<void> {
+    async listPayPeriods(arg0: string): Promise<Array<PayPeriod>> {
         if (this.processError) {
             try {
-                const result = await this.actor.updateEmployee(arg0, arg1, arg2);
+                const result = await this.actor.listPayPeriods(arg0);
                 return result;
             } catch (e) {
                 this.processError(e);
                 throw new Error("unreachable");
             }
         } else {
-            const result = await this.actor.updateEmployee(arg0, arg1, arg2);
+            const result = await this.actor.listPayPeriods(arg0);
             return result;
         }
     }
-    async updatePayrollEntry(arg0: string, arg1: string, arg2: number, arg3: number, arg4: boolean): Promise<void> {
+    async listPayrollEntries(arg0: string): Promise<Array<PayrollEntry>> {
         if (this.processError) {
             try {
-                const result = await this.actor.updatePayrollEntry(arg0, arg1, arg2, arg3, arg4);
+                const result = await this.actor.listPayrollEntries(arg0);
                 return result;
             } catch (e) {
                 this.processError(e);
                 throw new Error("unreachable");
             }
         } else {
-            const result = await this.actor.updatePayrollEntry(arg0, arg1, arg2, arg3, arg4);
+            const result = await this.actor.listPayrollEntries(arg0);
             return result;
         }
     }
+    async savePayPeriod(arg0: string, arg1: string, arg2: string, arg3: string, arg4: string, arg5: number, arg6: number, arg7: number, arg8: number, arg9: number, arg10: bigint): Promise<void> {
+        if (this.processError) {
+            try {
+                const result = await this.actor.savePayPeriod(arg0, arg1, arg2, arg3, arg4, arg5, arg6, arg7, arg8, arg9, arg10);
+                return result;
+            } catch (e) {
+                this.processError(e);
+                throw new Error("unreachable");
+            }
+        } else {
+            const result = await this.actor.savePayPeriod(arg0, arg1, arg2, arg3, arg4, arg5, arg6, arg7, arg8, arg9, arg10);
+            return result;
+        }
+    }
+    async updateEmployee(arg0: string, arg1: string, arg2: string, arg3: number): Promise<void> {
+        if (this.processError) {
+            try {
+                const result = await this.actor.updateEmployee(arg0, arg1, arg2, arg3);
+                return result;
+            } catch (e) {
+                this.processError(e);
+                throw new Error("unreachable");
+            }
+        } else {
+            const result = await this.actor.updateEmployee(arg0, arg1, arg2, arg3);
+            return result;
+        }
+    }
+    async updatePayrollEntry(arg0: string, arg1: string, arg2: string, arg3: number, arg4: number, arg5: boolean, arg6: number, arg7: number, arg8: boolean, arg9: number, arg10: string, arg11: string): Promise<void> {
+        if (this.processError) {
+            try {
+                const result = await this.actor.updatePayrollEntry(arg0, arg1, arg2, arg3, arg4, arg5, arg6, arg7, arg8, arg9, arg10, arg11);
+                return result;
+            } catch (e) {
+                this.processError(e);
+                throw new Error("unreachable");
+            }
+        } else {
+            const result = await this.actor.updatePayrollEntry(arg0, arg1, arg2, arg3, arg4, arg5, arg6, arg7, arg8, arg9, arg10, arg11);
+            return result;
+        }
+    }
+}
+function from_candid_opt_n1(_uploadFile: (file: ExternalBlob) => Promise<Uint8Array>, _downloadFile: (file: Uint8Array) => Promise<ExternalBlob>, value: [] | [_PayPeriod]): PayPeriod | null {
+    return value.length === 0 ? null : value[0];
 }
 export interface CreateActorOptions {
     agent?: Agent;
