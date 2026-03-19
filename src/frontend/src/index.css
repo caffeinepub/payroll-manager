@@ -1,0 +1,220 @@
+@import url("https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;500;600&family=IBM+Plex+Sans:wght@300;400;500;600;700&display=swap");
+
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+@layer base {
+  :root {
+    --radius: 0.375rem;
+
+    /* KONAK Palette — warm parchment background, dark brown primary, taupe accents */
+    --background: 0.975 0.008 75;
+    --foreground: 0.2 0.03 55;
+    --card: 1 0 0;
+    --card-foreground: 0.2 0.03 55;
+    --popover: 1 0 0;
+    --popover-foreground: 0.2 0.03 55;
+
+    /* Dark brown primary — #3d2b1a */
+    --primary: 0.28 0.06 50;
+    --primary-foreground: 0.97 0.005 75;
+
+    /* Warm taupe secondary — #9b8578 */
+    --secondary: 0.62 0.03 60;
+    --secondary-foreground: 0.97 0.005 75;
+
+    --muted: 0.93 0.012 70;
+    --muted-foreground: 0.52 0.025 60;
+
+    /* Lighter taupe accent */
+    --accent: 0.87 0.025 65;
+    --accent-foreground: 0.25 0.05 50;
+
+    --destructive: 0.577 0.245 27.325;
+    --destructive-foreground: 0.985 0 0;
+
+    --border: 0.86 0.018 65;
+    --input: 0.91 0.012 65;
+    --ring: 0.42 0.07 50;
+
+    /* Success green for saved indicator */
+    --success: 0.65 0.15 145;
+    --success-foreground: 0.97 0 0;
+
+    /* Chart colors */
+    --chart-1: 0.28 0.06 50;
+    --chart-2: 0.62 0.03 60;
+    --chart-3: 0.75 0.04 65;
+    --chart-4: 0.45 0.05 55;
+    --chart-5: 0.577 0.245 27;
+
+    /* Sidebar */
+    --sidebar: 0.24 0.05 50;
+    --sidebar-foreground: 0.93 0 0;
+    --sidebar-primary: 0.62 0.03 60;
+    --sidebar-primary-foreground: 0.93 0 0;
+    --sidebar-accent: 0.3 0.055 50;
+    --sidebar-accent-foreground: 0.93 0 0;
+    --sidebar-border: 0.32 0.05 50;
+    --sidebar-ring: 0.45 0.06 50;
+  }
+
+  .dark {
+    --background: 0.16 0.025 50;
+    --foreground: 0.94 0.008 70;
+    --card: 0.2 0.03 50;
+    --card-foreground: 0.94 0.008 70;
+    --popover: 0.22 0.035 50;
+    --popover-foreground: 0.94 0.008 70;
+    --primary: 0.72 0.035 65;
+    --primary-foreground: 0.18 0.03 50;
+    --secondary: 0.28 0.04 50;
+    --secondary-foreground: 0.94 0.008 70;
+    --muted: 0.28 0.04 50;
+    --muted-foreground: 0.62 0.02 60;
+    --accent: 0.62 0.03 60;
+    --accent-foreground: 0.16 0.025 50;
+    --destructive: 0.704 0.191 22.216;
+    --destructive-foreground: 0.15 0 0;
+    --border: 1 0 0 / 12%;
+    --input: 1 0 0 / 15%;
+    --ring: 0.55 0.04 60;
+    --success: 0.65 0.15 145;
+    --success-foreground: 0.97 0 0;
+    --chart-1: 0.72 0.035 65;
+    --chart-2: 0.65 0.15 145;
+    --chart-3: 0.62 0.03 60;
+    --chart-4: 0.5 0.04 55;
+    --chart-5: 0.7 0.19 22;
+    --sidebar: 0.18 0.03 50;
+    --sidebar-foreground: 0.94 0.008 70;
+    --sidebar-primary: 0.72 0.035 65;
+    --sidebar-primary-foreground: 0.18 0.03 50;
+    --sidebar-accent: 0.22 0.035 50;
+    --sidebar-accent-foreground: 0.94 0.008 70;
+    --sidebar-border: 1 0 0 / 12%;
+    --sidebar-ring: 0.45 0.04 55;
+  }
+
+  * {
+    @apply border-border;
+  }
+
+  body {
+    @apply bg-background text-foreground;
+    font-family: "IBM Plex Sans", sans-serif;
+  }
+
+  /* Monospace for all number inputs and totals */
+  .font-mono,
+  input[type="number"],
+  .numeric {
+    font-family: "IBM Plex Mono", monospace;
+  }
+}
+
+/* Print styles */
+@media print {
+  .no-print {
+    display: none !important;
+  }
+
+  .print-only {
+    display: block !important;
+  }
+
+  body {
+    background: white !important;
+    color: black !important;
+    font-family: "IBM Plex Sans", sans-serif;
+  }
+
+  header,
+  footer.app-footer,
+  .action-buttons,
+  button,
+  [role="dialog"],
+  [role="alertdialog"],
+  nav {
+    display: none !important;
+  }
+
+  .payroll-table-container {
+    overflow: visible !important;
+    box-shadow: none !important;
+    border: none !important;
+  }
+
+  table {
+    width: 100% !important;
+    border-collapse: collapse !important;
+  }
+
+  th,
+  td {
+    border: 1px solid #ccc !important;
+    padding: 8px 12px !important;
+    color: black !important;
+    background: white !important;
+  }
+
+  th {
+    background: #f0f0f0 !important;
+    font-weight: 600 !important;
+  }
+
+  .totals-section {
+    margin-top: 24px !important;
+    border-top: 2px solid #333 !important;
+    padding-top: 16px !important;
+  }
+
+  /* Remove input styling for print */
+  input {
+    border: none !important;
+    background: transparent !important;
+    -webkit-appearance: none;
+    appearance: none;
+  }
+
+  .print-title {
+    display: block !important;
+    font-size: 20px !important;
+    font-weight: 700 !important;
+    margin-bottom: 16px !important;
+    color: black !important;
+  }
+}
+
+/* Saving indicator pulse */
+@keyframes saving-pulse {
+  0%,
+  100% {
+    opacity: 1;
+  }
+  50% {
+    opacity: 0.4;
+  }
+}
+
+.saving-pulse {
+  animation: saving-pulse 1s ease-in-out infinite;
+}
+
+/* Smooth row hover */
+.payroll-row {
+  transition: background-color 0.1s ease;
+}
+
+/* Number input styles - clean look for table inputs */
+.table-input {
+  @apply h-9 w-full rounded border-0 bg-transparent px-2 text-right font-mono text-sm focus:bg-input focus:outline-none focus:ring-1 focus:ring-ring;
+  -moz-appearance: textfield;
+}
+
+.table-input::-webkit-outer-spin-button,
+.table-input::-webkit-inner-spin-button {
+  -webkit-appearance: none;
+  margin: 0;
+}

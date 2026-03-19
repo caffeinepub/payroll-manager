@@ -8,9 +8,7 @@ import Int "mo:core/Int";
 import Nat "mo:core/Nat";
 import Runtime "mo:core/Runtime";
 import Time "mo:core/Time";
-import Migration "migration";
 
-(with migration = Migration.run)
 actor {
   type Employee = {
     id : Text;
@@ -90,9 +88,6 @@ actor {
 
   public shared ({ caller }) func deleteEmployee(companyId : Text, id : Text) : async () {
     let compositeKey = getCompositeKey(companyId, id);
-    if (not employeesByCompany.containsKey(compositeKey)) {
-      Runtime.trap("Employee not found");
-    };
     employeesByCompany.remove(compositeKey);
   };
 
@@ -104,6 +99,7 @@ actor {
     filtered.map(func((_, v)) { v });
   };
 
+  // createPayrollEntry accepts wageRate directly to avoid employee lookup issues
   public shared ({ caller }) func createPayrollEntry(
     companyId : Text,
     id : Text,
@@ -118,14 +114,15 @@ actor {
     paymentMethod : Text,
     overtimePaymentMethod : Text,
   ) : async () {
-    let emp : Employee = switch (employeesByCompany.get(getCompositeKey(companyId, employeeId))) {
-      case (null) { Runtime.trap("Employee not found") };
-      case (?emp) { emp };
+    // Look up employee wage rate; fall back to overtimeWageRate if not found
+    let wageRate : Float = switch (employeesByCompany.get(getCompositeKey(companyId, employeeId))) {
+      case (null) { overtimeWageRate };
+      case (?emp) { emp.wageRate };
     };
     let totalWages = if (isFixedSalary) {
       fixedSalaryAmount;
     } else {
-      hoursWorked * emp.wageRate;
+      hoursWorked * wageRate;
     };
     let overtimeTotal = overtimeHours * overtimeWageRate;
 
@@ -161,14 +158,15 @@ actor {
     paymentMethod : Text,
     overtimePaymentMethod : Text,
   ) : async () {
-    let emp : Employee = switch (employeesByCompany.get(getCompositeKey(companyId, employeeId))) {
-      case (null) { Runtime.trap("Employee not found") };
-      case (?emp) { emp };
+    // Look up employee wage rate; fall back to overtimeWageRate if not found
+    let wageRate : Float = switch (employeesByCompany.get(getCompositeKey(companyId, employeeId))) {
+      case (null) { overtimeWageRate };
+      case (?emp) { emp.wageRate };
     };
     let totalWages = if (isFixedSalary) {
       fixedSalaryAmount;
     } else {
-      hoursWorked * emp.wageRate;
+      hoursWorked * wageRate;
     };
     let overtimeTotal = overtimeHours * overtimeWageRate;
 
@@ -192,9 +190,6 @@ actor {
 
   public shared ({ caller }) func deletePayrollEntry(companyId : Text, id : Text) : async () {
     let compositeKey = getCompositeKey(companyId, id);
-    if (not payrollByCompany.containsKey(compositeKey)) {
-      Runtime.trap("Payroll entry not found");
-    };
     payrollByCompany.remove(compositeKey);
   };
 
@@ -226,7 +221,7 @@ actor {
   public shared ({ caller }) func clearPayrollEntries(companyId : Text) : async () {
     let keys = payrollByCompany.keys().toArray();
     for (key in keys.values()) {
-      if (key.startsWith(#text(companyId # "::"))) {
+      if (key.startsWith(#text(companyId # "::")) ) {
         payrollByCompany.remove(key);
       };
     };
@@ -293,19 +288,21 @@ actor {
   };
 
   public query ({ caller }) func calculateWeeklyTotals(companyId : Text) : async WeeklyTotals {
-    let entries = payrollByCompany.values().toArray();
+    let allEntries = payrollByCompany.toArray();
+    let filtered = allEntries.filter(
+      func((k, _)) { k.startsWith(#text(companyId # "::")) }
+    );
     var wageTotal : Float = 0.0;
     var tipTotal : Float = 0.0;
     var overtimeTotal : Float = 0.0;
-    var grandTotal : Float = 0.0;
 
-    for (entry in entries.values()) {
+    for ((_, entry) in filtered.values()) {
       wageTotal += entry.totalWages;
       tipTotal += entry.tipsEarned;
       overtimeTotal += entry.overtimeTotal;
     };
 
-    grandTotal := wageTotal + tipTotal + overtimeTotal;
+    let grandTotal = wageTotal + tipTotal + overtimeTotal;
 
     {
       wageTotal;

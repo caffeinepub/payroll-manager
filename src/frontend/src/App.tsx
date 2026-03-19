@@ -1,26 +1,3 @@
-import { useState, useEffect, useCallback, useRef } from "react";
-import { useActor } from "./hooks/useActor";
-import type { Employee, PayrollEntry, PayPeriod } from "./backend.d.ts";
-import { Button } from "@/components/ui/button";
-import { Input } from "@/components/ui/input";
-import { Label } from "@/components/ui/label";
-import { Checkbox } from "@/components/ui/checkbox";
-import {
-  Table,
-  TableBody,
-  TableCell,
-  TableHead,
-  TableHeader,
-  TableRow,
-} from "@/components/ui/table";
-import {
-  Dialog,
-  DialogContent,
-  DialogDescription,
-  DialogFooter,
-  DialogHeader,
-  DialogTitle,
-} from "@/components/ui/dialog";
 import {
   AlertDialog,
   AlertDialogAction,
@@ -31,6 +8,19 @@ import {
   AlertDialogHeader,
   AlertDialogTitle,
 } from "@/components/ui/alert-dialog";
+import { Badge } from "@/components/ui/badge";
+import { Button } from "@/components/ui/button";
+import { Checkbox } from "@/components/ui/checkbox";
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+} from "@/components/ui/dialog";
+import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
 import {
   Select,
   SelectContent,
@@ -38,30 +28,41 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
+import { Skeleton } from "@/components/ui/skeleton";
 import { Toaster } from "@/components/ui/sonner";
-import { toast } from "sonner";
 import {
-  Loader2,
-  Plus,
-  RefreshCw,
-  Pencil,
-  Trash2,
-  Banknote,
-  Users,
-  CheckCircle2,
-  FileText,
-  BookOpen,
-  Zap,
+  Table,
+  TableBody,
+  TableCell,
+  TableHead,
+  TableHeader,
+  TableRow,
+} from "@/components/ui/table";
+import {
   ArrowLeft,
   ArrowUpDown,
+  Banknote,
+  BookOpen,
   Calendar,
-  TrendingUp,
+  CheckCircle2,
   Clock,
+  Coins,
+  FileText,
   Heart,
+  Loader2,
+  Pencil,
+  Plus,
+  RefreshCw,
+  Trash2,
+  TrendingUp,
+  Users,
   Wallet,
+  Zap,
 } from "lucide-react";
-import { Skeleton } from "@/components/ui/skeleton";
-import { Badge } from "@/components/ui/badge";
+import { useCallback, useEffect, useRef, useState } from "react";
+import { toast } from "sonner";
+import type { Employee, PayPeriod, PayrollEntry } from "./backend.d.ts";
+import { useActor } from "./hooks/useActor";
 
 // ─────────────────────────────────────────────
 // Company Config
@@ -148,47 +149,36 @@ function formatCurrency(value: number): string {
   }).format(value);
 }
 
-function calcTotalWages(hours: string, wageRate: string): number {
-  const h = parseFloat(hours) || 0;
-  const w = parseFloat(wageRate) || 0;
+function calcOvertimeTotal(
+  overtimeHours: string,
+  overtimeWageRate: string,
+): number {
+  const h = Number.parseFloat(overtimeHours) || 0;
+  const w = Number.parseFloat(overtimeWageRate) || 0;
   return h * w;
-}
-
-function calcOvertimeTotal(overtimeHours: string, overtimeWageRate: string): number {
-  const h = parseFloat(overtimeHours) || 0;
-  const w = parseFloat(overtimeWageRate) || 0;
-  return h * w;
-}
-
-function calcIndividualTotal(row: PayrollRow): number {
-  let mainAmount: number;
-  if (row.isFixedSalary) {
-    mainAmount = parseFloat(row.localFixedSalaryAmount) || 0;
-  } else {
-    const hours = row.isStudent ? 80 : parseFloat(row.localHours) || 0;
-    mainAmount = hours * (parseFloat(row.localWageRate) || 0);
-  }
-  const tips = parseFloat(row.localTips) || 0;
-  const overtime = row.isStudent ? calcOvertimeTotal(row.localOvertimeHours, row.localOvertimeWageRate) : 0;
-  return mainAmount + tips + overtime;
 }
 
 function computedCashTotalFromRows(rows: PayrollRow[]): number {
-  return rows.reduce((sum, row) => {
+  return rows.reduce((acc, row) => {
+    let rowCash = 0;
     // Main payment
     if (row.paymentMethod === "cash") {
       const mainAmount = row.isFixedSalary
-        ? parseFloat(row.localFixedSalaryAmount) || 0
-        : (row.isStudent ? 80 : parseFloat(row.localHours) || 0) * (parseFloat(row.localWageRate) || 0);
-      sum += mainAmount;
+        ? Number.parseFloat(row.localFixedSalaryAmount) || 0
+        : (row.isStudent ? 80 : Number.parseFloat(row.localHours) || 0) *
+          (Number.parseFloat(row.localWageRate) || 0);
+      rowCash += mainAmount;
       // Tips follow main payment method
-      sum += parseFloat(row.localTips) || 0;
+      rowCash += Number.parseFloat(row.localTips) || 0;
     }
     // Overtime (students only)
     if (row.isStudent && row.overtimePaymentMethod === "cash") {
-      sum += calcOvertimeTotal(row.localOvertimeHours, row.localOvertimeWageRate);
+      rowCash += calcOvertimeTotal(
+        row.localOvertimeHours,
+        row.localOvertimeWageRate,
+      );
     }
-    return sum;
+    return acc + rowCash;
   }, 0);
 }
 
@@ -210,30 +200,34 @@ function formatPeriodLabel(startDate: string, endDate: string): string {
 // PDF Generators
 // ─────────────────────────────────────────────
 
-function printAccountantPDF(rows: PayrollRow[], startDate: string, endDate: string, co: CompanyConfig) {
-  const periodLabel = startDate && endDate
-    ? `Period: ${formatPeriodLabel(startDate, endDate)}`
-    : `Date: ${formatDateUK(todayISO())}`;
+function printAccountantPDF(
+  rows: PayrollRow[],
+  startDate: string,
+  endDate: string,
+  co: CompanyConfig,
+) {
+  const periodLabel =
+    startDate && endDate
+      ? `Period: ${formatPeriodLabel(startDate, endDate)}`
+      : `Date: ${formatDateUK(todayISO())}`;
 
   // Sort alphabetically for accountant PDF
-  const sortedRows = [...rows].sort((a, b) => a.employee.name.localeCompare(b.employee.name));
+  const sortedRows = [...rows].sort((a, b) =>
+    a.employee.name.localeCompare(b.employee.name),
+  );
 
   const tableRows = sortedRows
-    .map(
-      (row) => {
-        // For fixed salary, show "Fixed Salary" as hours display; students show 80h
-        const hoursDisplay = row.isFixedSalary
-          ? `Fixed: ${formatCurrency(parseFloat(row.localFixedSalaryAmount) || 0)}`
-          : String(row.isStudent ? 80 : parseFloat(row.localHours) || 0);
-        const paymentDisplay = row.paymentMethod === "cash" ? "Cash" : "Bank";
-        return `
+    .map((row) => {
+      // For fixed salary, show "Fixed Salary" as hours display; students show 80h
+      const hoursDisplay = row.isFixedSalary
+        ? `Fixed: ${formatCurrency(Number.parseFloat(row.localFixedSalaryAmount) || 0)}`
+        : String(row.isStudent ? 80 : Number.parseFloat(row.localHours) || 0);
+      return `
       <tr>
         <td>${row.employee.name}</td>
         <td style="text-align:right;">${hoursDisplay}</td>
-        <td style="text-align:center;">${paymentDisplay}</td>
       </tr>`;
-      }
-    )
+    })
     .join("");
 
   const html = `<!DOCTYPE html>
@@ -266,7 +260,6 @@ function printAccountantPDF(rows: PayrollRow[], startDate: string, endDate: stri
       <tr>
         <th>Employee Name</th>
         <th style="text-align:right;">Hours / Fixed Salary</th>
-        <th style="text-align:center;">Payment</th>
       </tr>
     </thead>
     <tbody>
@@ -297,33 +290,48 @@ function printFullSummaryPDF(
   cashTotal: number,
   startDate: string,
   endDate: string,
-  co: CompanyConfig
+  co: CompanyConfig,
+  tipsOnly = false,
 ) {
-  const periodLabel = startDate && endDate
-    ? `Period: ${formatPeriodLabel(startDate, endDate)}`
-    : `Date: ${formatDateUK(todayISO())}`;
+  const periodLabel =
+    startDate && endDate
+      ? `Period: ${formatPeriodLabel(startDate, endDate)}`
+      : `Date: ${formatDateUK(todayISO())}`;
+  const docTitle = tipsOnly
+    ? `${co.name} — Tips Summary`
+    : `${co.name} — Full Summary`;
+  const docHeading = tipsOnly
+    ? "Wages Management — Tips Summary"
+    : "Wages Management — Full Summary";
 
   const tableRows = rows
     .map((row) => {
       let mainAmount: number;
       let hoursCell: string;
       if (row.isFixedSalary) {
-        mainAmount = parseFloat(row.localFixedSalaryAmount) || 0;
-        hoursCell = `<em>Fixed</em>`;
+        mainAmount = Number.parseFloat(row.localFixedSalaryAmount) || 0;
+        hoursCell = "<em>Fixed</em>";
       } else {
-        const hours = row.isStudent ? 80 : parseFloat(row.localHours) || 0;
-        mainAmount = hours * (parseFloat(row.localWageRate) || 0);
+        const hours = row.isStudent
+          ? 80
+          : Number.parseFloat(row.localHours) || 0;
+        mainAmount = hours * (Number.parseFloat(row.localWageRate) || 0);
         hoursCell = String(hours);
       }
-      const tips = parseFloat(row.localTips) || 0;
-      const overtimeHrs = row.isStudent ? parseFloat(row.localOvertimeHours) || 0 : 0;
-      const overtimeWage = row.isStudent ? parseFloat(row.localOvertimeWageRate) || 0 : 0;
+      const tips = Number.parseFloat(row.localTips) || 0;
+      const overtimeHrs = row.isStudent
+        ? Number.parseFloat(row.localOvertimeHours) || 0
+        : 0;
+      const overtimeWage = row.isStudent
+        ? Number.parseFloat(row.localOvertimeWageRate) || 0
+        : 0;
       const overtimeTotal = overtimeHrs * overtimeWage;
       const individualTotal = mainAmount + tips + overtimeTotal;
       const paymentDisplay = row.paymentMethod === "cash" ? "Cash" : "Bank";
 
-      const overtimeSubRow = row.isStudent && overtimeHrs > 0
-        ? `<tr style="background:#eff6ff; font-size:11px;">
+      const overtimeSubRow =
+        row.isStudent && overtimeHrs > 0
+          ? `<tr style="background:#eff6ff; font-size:11px;">
             <td style="padding-left:24px; color:#3b82f6; font-style:italic;">↳ Overtime Hours</td>
             <td style="text-align:right; color:#3b82f6;">${overtimeHrs}h @ £${overtimeWage.toFixed(2)}/h</td>
             <td style="text-align:right;"></td>
@@ -333,13 +341,13 @@ function printFullSummaryPDF(
             <td style="text-align:center; color:#3b82f6; font-size:10px;">${row.overtimePaymentMethod === "cash" ? "Cash" : "Bank"}</td>
             <td style="text-align:right;"></td>
           </tr>`
-        : "";
+          : "";
 
       return `
       <tr>
         <td>${row.employee.name}${row.isStudent ? ' <span class="student-badge">Student</span>' : ""}${row.isFixedSalary ? ' <span class="fixed-badge">Fixed</span>' : ""}</td>
         <td style="text-align:right;">${hoursCell}</td>
-        <td style="text-align:right;">${row.isFixedSalary ? "—" : `£${(parseFloat(row.localWageRate) || 0).toFixed(2)}`}</td>
+        <td style="text-align:right;">${row.isFixedSalary ? "—" : `£${(Number.parseFloat(row.localWageRate) || 0).toFixed(2)}`}</td>
         <td style="text-align:right;">${row.isFixedSalary ? `£${mainAmount.toFixed(2)}` : `£${mainAmount.toFixed(2)}`}</td>
         <td style="text-align:right;">£${tips.toFixed(2)}</td>
         <td style="text-align:right;">£${overtimeTotal.toFixed(2)}</td>
@@ -354,7 +362,7 @@ function printFullSummaryPDF(
 <html lang="en">
 <head>
   <meta charset="UTF-8" />
-  <title>${co.name} — Full Summary</title>
+  <title>${docTitle}</title>
   <style>
     * { box-sizing: border-box; margin: 0; padding: 0; }
     body { font-family: Arial, sans-serif; font-size: 12px; color: #1a1008; background: #fff; padding: 32px; }
@@ -382,7 +390,7 @@ function printFullSummaryPDF(
 <body>
   <div class="header">
     <h1>${co.name}</h1>
-    <h2>Wages Management — Full Summary</h2>
+    <h2>${docHeading}</h2>
     <p class="period">${periodLabel}</p>
   </div>
   <table>
@@ -443,6 +451,95 @@ function printFullSummaryPDF(
 }
 
 // ─────────────────────────────────────────────
+// Tips-Only PDF
+// ─────────────────────────────────────────────
+function printTipsPDF(
+  rows: PayrollRow[],
+  _totalWages: number,
+  _totalTips: number,
+  _totalOvertime: number,
+  _grandTotal: number,
+  _cashTotal: number,
+  startDate: string,
+  endDate: string,
+  co: CompanyConfig,
+) {
+  const tipsRows = rows
+    .filter((row) => (Number.parseFloat(row.localTips) || 0) > 0)
+    .sort((a, b) => a.employee.name.localeCompare(b.employee.name));
+
+  if (tipsRows.length === 0) {
+    toast.error("No employees have tips this period.");
+    return;
+  }
+
+  const periodLabel =
+    startDate && endDate
+      ? `Period: ${formatPeriodLabel(startDate, endDate)}`
+      : `Date: ${formatDateUK(todayISO())}`;
+
+  const tableRows = tipsRows
+    .map(
+      (row) => `
+    <tr>
+      <td>${row.employee.name}</td>
+      <td style="text-align:right; font-weight:600;">£${(Number.parseFloat(row.localTips) || 0).toFixed(2)}</td>
+    </tr>`,
+    )
+    .join("");
+
+  const html = `<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <title>${co.name} — Tips Summary</title>
+  <style>
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+    body { font-family: Arial, sans-serif; font-size: 12px; color: #1a1008; background: #fff; padding: 32px; }
+    .header { border-bottom: 2px solid ${co.pdfPrimary}; padding-bottom: 16px; margin-bottom: 20px; }
+    h1 { font-size: 18px; font-weight: bold; color: ${co.pdfPrimary}; }
+    h2 { font-size: 14px; font-weight: 600; color: ${co.pdfAccent}; margin-top: 4px; }
+    .period { font-size: 12px; color: ${co.accent}; margin-top: 8px; }
+    table { width: 100%; border-collapse: collapse; margin-bottom: 24px; }
+    th, td { border: 1px solid ${co.pdfBorder}; padding: 8px 10px; text-align: left; }
+    th { background: ${co.pdfPrimary}; color: ${co.primaryFg}; font-size: 10px; text-transform: uppercase; letter-spacing: 0.06em; }
+    tr:nth-child(even) td { background: ${co.pdfEven}; }
+    .footer { margin-top: 24px; font-size: 10px; color: ${co.accent}; text-align: center; border-top: 1px solid ${co.pdfBorder}; padding-top: 12px; }
+  </style>
+</head>
+<body>
+  <div class="header">
+    <h1>${co.name}</h1>
+    <h2>Tips Summary</h2>
+    <p class="period">${periodLabel}</p>
+  </div>
+  <table>
+    <thead>
+      <tr>
+        <th>Employee Name</th>
+        <th style="text-align:right;">Tips Earned</th>
+      </tr>
+    </thead>
+    <tbody>
+      ${tableRows}
+    </tbody>
+  </table>
+  <div class="footer">${co.name} Wages Management — Confidential</div>
+</body>
+</html>`;
+
+  const win = window.open("", "_blank");
+  if (!win) {
+    toast.error("Pop-up blocked. Please allow pop-ups to generate PDFs.");
+    return;
+  }
+  win.document.write(html);
+  win.document.close();
+  win.focus();
+  setTimeout(() => win.print(), 500);
+}
+
+// ─────────────────────────────────────────────
 // Payment Method Toggle Button
 // ─────────────────────────────────────────────
 
@@ -460,9 +557,10 @@ function PaymentToggle({ value, onChange, label }: PaymentToggleProps) {
       title={label ?? (value === "cash" ? "Cash payment" : "Bank transfer")}
       className={`
         inline-flex items-center justify-center gap-1 rounded-md border px-2 py-1 text-xs font-semibold transition-colors min-h-[36px] min-w-[52px]
-        ${value === "cash"
-          ? "bg-amber-100 text-amber-700 border-amber-300 hover:bg-amber-200"
-          : "bg-background text-muted-foreground border-border hover:bg-muted"
+        ${
+          value === "cash"
+            ? "bg-amber-100 text-amber-700 border-amber-300 hover:bg-amber-200"
+            : "bg-background text-muted-foreground border-border hover:bg-muted"
         }
       `}
     >
@@ -527,7 +625,9 @@ function EmployeeDialog({
 }: EmployeeDialogProps) {
   const [name, setName] = useState(initialName);
   const [wageRate, setWageRate] = useState(initialWageRate);
-  const [errors, setErrors] = useState<{ name?: string; wageRate?: string }>({});
+  const [errors, setErrors] = useState<{ name?: string; wageRate?: string }>(
+    {},
+  );
   const [saving, setSaving] = useState(false);
 
   useEffect(() => {
@@ -542,8 +642,8 @@ function EmployeeDialog({
   function validate(): boolean {
     const newErrors: { name?: string; wageRate?: string } = {};
     if (!name.trim()) newErrors.name = "Name is required";
-    const rate = parseFloat(wageRate);
-    if (!wageRate || isNaN(rate) || rate <= 0)
+    const rate = Number.parseFloat(wageRate);
+    if (!wageRate || Number.isNaN(rate) || rate <= 0)
       newErrors.wageRate = "Wage rate must be a positive number";
     setErrors(newErrors);
     return Object.keys(newErrors).length === 0;
@@ -553,7 +653,7 @@ function EmployeeDialog({
     if (!validate()) return;
     setSaving(true);
     try {
-      await onSave(name.trim(), parseFloat(wageRate));
+      await onSave(name.trim(), Number.parseFloat(wageRate));
       onOpenChange(false);
     } catch {
       // handled upstream
@@ -615,10 +715,19 @@ function EmployeeDialog({
           </div>
         </div>
         <DialogFooter>
-          <Button variant="outline" onClick={() => onOpenChange(false)} disabled={saving} className="min-h-[44px]">
+          <Button
+            variant="outline"
+            onClick={() => onOpenChange(false)}
+            disabled={saving}
+            className="min-h-[44px]"
+          >
             Cancel
           </Button>
-          <Button onClick={handleSave} disabled={saving} className="min-h-[44px]">
+          <Button
+            onClick={handleSave}
+            disabled={saving}
+            className="min-h-[44px]"
+          >
             {saving ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : null}
             {saving ? "Saving…" : "Save"}
           </Button>
@@ -659,7 +768,9 @@ function QuickEntryPanel({ rows, onUpdate }: QuickEntryPanelProps) {
   const [isFixedSalary, setIsFixedSalary] = useState(false);
   const [fixedSalaryAmount, setFixedSalaryAmount] = useState("0");
   const [paymentMethod, setPaymentMethod] = useState<"cash" | "bank">("bank");
-  const [overtimePaymentMethod, setOvertimePaymentMethod] = useState<"cash" | "bank">("bank");
+  const [overtimePaymentMethod, setOvertimePaymentMethod] = useState<
+    "cash" | "bank"
+  >("bank");
 
   function handleSelect(id: string) {
     setSelectedId(id);
@@ -722,7 +833,10 @@ function QuickEntryPanel({ rows, onUpdate }: QuickEntryPanelProps) {
               Employee
             </Label>
             <Select value={selectedId} onValueChange={handleSelect}>
-              <SelectTrigger className="h-11 bg-background" style={{ fontSize: "16px" }}>
+              <SelectTrigger
+                className="h-11 bg-background"
+                style={{ fontSize: "16px" }}
+              >
                 <SelectValue placeholder="Select employee…" />
               </SelectTrigger>
               <SelectContent>
@@ -745,7 +859,9 @@ function QuickEntryPanel({ rows, onUpdate }: QuickEntryPanelProps) {
             <div className="flex h-11 items-center gap-2">
               <Checkbox
                 checked={isFixedSalary}
-                onCheckedChange={(checked) => handleFixedSalaryChange(checked === true)}
+                onCheckedChange={(checked) =>
+                  handleFixedSalaryChange(checked === true)
+                }
                 id="quick-entry-fixed"
                 className="h-5 w-5"
               />
@@ -829,7 +945,9 @@ function QuickEntryPanel({ rows, onUpdate }: QuickEntryPanelProps) {
             <div className="flex h-11 items-center">
               <PaymentToggle
                 value={paymentMethod}
-                onChange={() => setPaymentMethod((p) => p === "cash" ? "bank" : "cash")}
+                onChange={() =>
+                  setPaymentMethod((p) => (p === "cash" ? "bank" : "cash"))
+                }
                 label="Toggle main payment method"
               />
             </div>
@@ -843,7 +961,9 @@ function QuickEntryPanel({ rows, onUpdate }: QuickEntryPanelProps) {
             <div className="flex h-11 items-center gap-2">
               <Checkbox
                 checked={isStudent}
-                onCheckedChange={(checked) => handleStudentChange(checked === true)}
+                onCheckedChange={(checked) =>
+                  handleStudentChange(checked === true)
+                }
                 id="quick-entry-student"
                 className="h-5 w-5"
               />
@@ -900,7 +1020,11 @@ function QuickEntryPanel({ rows, onUpdate }: QuickEntryPanelProps) {
                 <div className="flex h-11 items-center">
                   <PaymentToggle
                     value={overtimePaymentMethod}
-                    onChange={() => setOvertimePaymentMethod((p) => p === "cash" ? "bank" : "cash")}
+                    onChange={() =>
+                      setOvertimePaymentMethod((p) =>
+                        p === "cash" ? "bank" : "cash",
+                      )
+                    }
                     label="Toggle overtime payment method"
                   />
                 </div>
@@ -941,27 +1065,52 @@ interface DashboardProps {
   onCompanySwitch: (id: CompanyId) => void;
 }
 
-function DashboardView({ latestPeriod, loadingPeriod, onEnterPayroll, company, activeCompany, onCompanySwitch }: DashboardProps) {
+function DashboardView({
+  latestPeriod,
+  loadingPeriod,
+  onEnterPayroll,
+  company,
+  activeCompany,
+  onCompanySwitch,
+}: DashboardProps) {
   return (
     <div className="min-h-screen bg-background flex flex-col">
       {/* Header */}
-      <header style={{ backgroundColor: company.headerBg }} className="border-b border-border shadow-xs">
+      <header
+        style={{ backgroundColor: company.headerBg }}
+        className="border-b border-border shadow-xs"
+      >
         <div className="mx-auto max-w-5xl px-4 py-5 sm:px-6">
           <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
             <div className="flex items-center gap-3">
-              <div className="flex h-10 w-10 items-center justify-center rounded-md" style={{ backgroundColor: "rgba(255,255,255,0.15)" }}>
-                <Banknote className="h-5 w-5" style={{ color: company.primaryFg }} />
+              <div
+                className="flex h-10 w-10 items-center justify-center rounded-md"
+                style={{ backgroundColor: "rgba(255,255,255,0.15)" }}
+              >
+                <Banknote
+                  className="h-5 w-5"
+                  style={{ color: company.primaryFg }}
+                />
               </div>
               <div>
-                <h1 className="text-xl font-bold tracking-tight" style={{ color: company.primaryFg }}>
+                <h1
+                  className="text-xl font-bold tracking-tight"
+                  style={{ color: company.primaryFg }}
+                >
                   {company.name}
                 </h1>
-                <p className="text-xs font-medium tracking-wide uppercase" style={{ color: `${company.primaryFg}99` }}>
+                <p
+                  className="text-xs font-medium tracking-wide uppercase"
+                  style={{ color: `${company.primaryFg}99` }}
+                >
                   {company.subtitle}
                 </p>
               </div>
             </div>
-            <CompanySwitcher activeCompany={activeCompany} onSwitch={onCompanySwitch} />
+            <CompanySwitcher
+              activeCompany={activeCompany}
+              onSwitch={onCompanySwitch}
+            />
           </div>
         </div>
       </header>
@@ -974,7 +1123,10 @@ function DashboardView({ latestPeriod, loadingPeriod, onEnterPayroll, company, a
           </h2>
           <p className="text-muted-foreground text-base">
             Here's a summary of your most recent pay period for{" "}
-            <span className="font-semibold text-foreground">{company.name}</span>.
+            <span className="font-semibold text-foreground">
+              {company.name}
+            </span>
+            .
           </p>
         </div>
 
@@ -992,25 +1144,46 @@ function DashboardView({ latestPeriod, loadingPeriod, onEnterPayroll, company, a
         ) : latestPeriod ? (
           <div className="rounded-xl border border-border bg-card shadow-xs mb-8 overflow-hidden">
             {/* Card header */}
-            <div className="px-6 py-4" style={{ backgroundColor: company.primary }}>
+            <div
+              className="px-6 py-4"
+              style={{ backgroundColor: company.primary }}
+            >
               <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-2">
                 <div>
-                  <p className="text-xs font-semibold uppercase tracking-widest mb-1" style={{ color: `${company.primaryFg}b3` }}>
+                  <p
+                    className="text-xs font-semibold uppercase tracking-widest mb-1"
+                    style={{ color: `${company.primaryFg}b3` }}
+                  >
                     Most Recent Pay Period
                   </p>
                   <div className="flex items-center gap-2">
-                    <Calendar className="h-4 w-4" style={{ color: `${company.primaryFg}cc` }} />
-                    <span className="font-semibold text-sm" style={{ color: company.primaryFg }}>
+                    <Calendar
+                      className="h-4 w-4"
+                      style={{ color: `${company.primaryFg}cc` }}
+                    />
+                    <span
+                      className="font-semibold text-sm"
+                      style={{ color: company.primaryFg }}
+                    >
                       {latestPeriod._label ||
-                        formatPeriodLabel(latestPeriod.startDate, latestPeriod.endDate)}
+                        formatPeriodLabel(
+                          latestPeriod.startDate,
+                          latestPeriod.endDate,
+                        )}
                     </span>
                   </div>
                 </div>
                 <div className="text-right">
-                  <p className="text-xs uppercase tracking-widest mb-0.5" style={{ color: `${company.primaryFg}b3` }}>
+                  <p
+                    className="text-xs uppercase tracking-widest mb-0.5"
+                    style={{ color: `${company.primaryFg}b3` }}
+                  >
                     Grand Total
                   </p>
-                  <p className="font-bold text-3xl font-mono tabular-nums" style={{ color: company.primaryFg }}>
+                  <p
+                    className="font-bold text-3xl font-mono tabular-nums"
+                    style={{ color: company.primaryFg }}
+                  >
                     {formatCurrency(latestPeriod.grandTotal)}
                   </p>
                 </div>
@@ -1083,8 +1256,12 @@ function DashboardView({ latestPeriod, loadingPeriod, onEnterPayroll, company, a
                 <Banknote className="h-8 w-8 opacity-50" />
               </div>
               <div>
-                <p className="font-semibold text-foreground text-lg">No pay periods saved yet</p>
-                <p className="text-sm mt-1">Enter your first payroll to see a summary here.</p>
+                <p className="font-semibold text-foreground text-lg">
+                  No pay periods saved yet
+                </p>
+                <p className="text-sm mt-1">
+                  Enter your first payroll to see a summary here.
+                </p>
               </div>
             </div>
           </div>
@@ -1096,7 +1273,10 @@ function DashboardView({ latestPeriod, loadingPeriod, onEnterPayroll, company, a
             size="lg"
             onClick={onEnterPayroll}
             className="h-14 px-10 text-base font-semibold gap-2 min-w-[220px]"
-            style={{ backgroundColor: company.primary, color: company.primaryFg }}
+            style={{
+              backgroundColor: company.primary,
+              color: company.primaryFg,
+            }}
           >
             <Banknote className="h-5 w-5" />
             Enter Payroll
@@ -1107,7 +1287,9 @@ function DashboardView({ latestPeriod, loadingPeriod, onEnterPayroll, company, a
       {/* Footer */}
       <footer className="border-t border-border py-5 text-center text-xs text-muted-foreground">
         © 2026. Built with{" "}
-        <span className="text-destructive" role="img" aria-label="love">♥</span>{" "}
+        <span className="text-destructive" role="img" aria-label="love">
+          ♥
+        </span>{" "}
         using{" "}
         <a
           href="https://caffeine.ai"
@@ -1155,11 +1337,15 @@ export default function App() {
   // Add/Edit dialogs
   const [addDialogOpen, setAddDialogOpen] = useState(false);
   const [editDialogOpen, setEditDialogOpen] = useState(false);
-  const [editingEmployeeId, setEditingEmployeeId] = useState<string | null>(null);
+  const [editingEmployeeId, setEditingEmployeeId] = useState<string | null>(
+    null,
+  );
 
   // Delete confirmation
   const [deleteConfirmOpen, setDeleteConfirmOpen] = useState(false);
-  const [deletingEmployeeId, setDeletingEmployeeId] = useState<string | null>(null);
+  const [deletingEmployeeId, setDeletingEmployeeId] = useState<string | null>(
+    null,
+  );
   const [deleteInProgress, setDeleteInProgress] = useState(false);
 
   // Clear pay period
@@ -1186,64 +1372,96 @@ export default function App() {
     setLoading(true);
     setLoadingPeriod(true);
     setLoadError(null);
-    try {
-      const [employees, entries, period] = await Promise.all([
-        actor.listEmployees(activeCompany),
-        actor.listPayrollEntries(activeCompany),
-        actor.getLatestPayPeriod(activeCompany),
-      ]);
 
-      setLatestPeriod(period);
+    const delay = (ms: number) =>
+      new Promise<void>((res) => setTimeout(res, ms));
+    let lastErr: unknown;
 
-      // Map entries by employeeId
-      const entryMap = new Map<string, PayrollEntry>();
-      for (const entry of entries) {
-        entryMap.set(entry.employeeId, entry);
-      }
+    for (let attempt = 0; attempt < 3; attempt++) {
+      if (attempt > 0) await delay(attempt * 1500);
+      try {
+        const [employees, entries, period] = await Promise.all([
+          actor.listEmployees(activeCompany),
+          actor.listPayrollEntries(activeCompany),
+          actor.getLatestPayPeriod(activeCompany),
+        ]);
 
-      // For employees with no entry, create one
-      const missingEntries = employees.filter((emp) => !entryMap.has(emp.id));
-      if (missingEntries.length > 0) {
-        await Promise.all(
-          missingEntries.map((emp) => {
-            const id = crypto.randomUUID();
-            return actor.createPayrollEntry(activeCompany, id, emp.id, 0, 0, false, 0, emp.wageRate, false, 0, "bank", "bank");
-          })
-        );
-        const updatedEntries = await actor.listPayrollEntries(activeCompany);
-        for (const entry of updatedEntries) {
+        setLatestPeriod(period);
+
+        // Map entries by employeeId
+        const entryMap = new Map<string, PayrollEntry>();
+        for (const entry of entries) {
           entryMap.set(entry.employeeId, entry);
         }
+
+        // For employees with no entry, create one
+        const missingEntries = employees.filter((emp) => !entryMap.has(emp.id));
+        if (missingEntries.length > 0) {
+          await Promise.all(
+            missingEntries.map((emp) => {
+              const id = crypto.randomUUID();
+              return actor.createPayrollEntry(
+                activeCompany,
+                id,
+                emp.id,
+                0,
+                0,
+                false,
+                0,
+                emp.wageRate,
+                false,
+                0,
+                "bank",
+                "bank",
+              );
+            }),
+          );
+          const updatedEntries = await actor.listPayrollEntries(activeCompany);
+          for (const entry of updatedEntries) {
+            entryMap.set(entry.employeeId, entry);
+          }
+        }
+
+        const newRows: PayrollRow[] = employees.map((emp) => {
+          const entry = entryMap.get(emp.id) || null;
+          return {
+            employee: emp,
+            payrollEntry: entry,
+            localHours: entry ? String(entry.hoursWorked) : "0",
+            localTips: entry ? String(entry.tipsEarned) : "0",
+            localWageRate: String(emp.wageRate),
+            isStudent: entry ? entry.isStudent : false,
+            localOvertimeHours: entry ? String(entry.overtimeHours) : "0",
+            localOvertimeWageRate: entry
+              ? String(entry.overtimeWageRate)
+              : String(emp.wageRate),
+            isFixedSalary: entry ? (entry.isFixedSalary ?? false) : false,
+            localFixedSalaryAmount: entry
+              ? String(entry.fixedSalaryAmount ?? 0)
+              : "0",
+            paymentMethod: (entry?.paymentMethod as "cash" | "bank") || "bank",
+            overtimePaymentMethod:
+              (entry?.overtimePaymentMethod as "cash" | "bank") || "bank",
+            saving: false,
+            savedAt: null,
+          };
+        });
+
+        setRows(newRows);
+        setLoading(false);
+        setLoadingPeriod(false);
+        return;
+      } catch (err) {
+        console.error(`Load attempt ${attempt + 1} failed:`, err);
+        lastErr = err;
       }
-
-      const newRows: PayrollRow[] = employees.map((emp) => {
-        const entry = entryMap.get(emp.id) || null;
-        return {
-          employee: emp,
-          payrollEntry: entry,
-          localHours: entry ? String(entry.hoursWorked) : "0",
-          localTips: entry ? String(entry.tipsEarned) : "0",
-          localWageRate: String(emp.wageRate),
-          isStudent: entry ? entry.isStudent : false,
-          localOvertimeHours: entry ? String(entry.overtimeHours) : "0",
-          localOvertimeWageRate: entry ? String(entry.overtimeWageRate) : String(emp.wageRate),
-          isFixedSalary: entry ? (entry.isFixedSalary ?? false) : false,
-          localFixedSalaryAmount: entry ? String(entry.fixedSalaryAmount ?? 0) : "0",
-          paymentMethod: (entry?.paymentMethod as "cash" | "bank") || "bank",
-          overtimePaymentMethod: (entry?.overtimePaymentMethod as "cash" | "bank") || "bank",
-          saving: false,
-          savedAt: null,
-        };
-      });
-
-      setRows(newRows);
-    } catch (err) {
-      console.error(err);
-      setLoadError("Failed to load payroll data. Please try again.");
-    } finally {
-      setLoading(false);
-      setLoadingPeriod(false);
     }
+
+    // All retries exhausted
+    console.error("All load attempts failed:", lastErr);
+    setLoadError("Failed to load payroll data. Please try again.");
+    setLoading(false);
+    setLoadingPeriod(false);
   }, [actor, activeCompany]);
 
   useEffect(() => {
@@ -1262,7 +1480,7 @@ export default function App() {
 
   function updateRow(employeeId: string, patch: Partial<PayrollRow>) {
     setRows((prev) =>
-      prev.map((r) => (r.employee.id === employeeId ? { ...r, ...patch } : r))
+      prev.map((r) => (r.employee.id === employeeId ? { ...r, ...patch } : r)),
     );
   }
 
@@ -1271,12 +1489,14 @@ export default function App() {
     const empId = row.employee.id;
     updateRow(empId, { saving: true });
     try {
-      const hours = row.isStudent ? 80 : parseFloat(row.localHours) || 0;
-      const tips = parseFloat(row.localTips) || 0;
-      const wageRate = parseFloat(row.localWageRate) || 0;
-      const overtimeHours = parseFloat(row.localOvertimeHours) || 0;
-      const overtimeWageRate = parseFloat(row.localOvertimeWageRate) || 0;
-      const fixedSalaryAmount = parseFloat(row.localFixedSalaryAmount) || 0;
+      const hours = row.isStudent ? 80 : Number.parseFloat(row.localHours) || 0;
+      const tips = Number.parseFloat(row.localTips) || 0;
+      const wageRate = Number.parseFloat(row.localWageRate) || 0;
+      const overtimeHours = Number.parseFloat(row.localOvertimeHours) || 0;
+      const overtimeWageRate =
+        Number.parseFloat(row.localOvertimeWageRate) || 0;
+      const fixedSalaryAmount =
+        Number.parseFloat(row.localFixedSalaryAmount) || 0;
 
       await Promise.all([
         actor.updatePayrollEntry(
@@ -1291,7 +1511,7 @@ export default function App() {
           row.isFixedSalary,
           fixedSalaryAmount,
           row.paymentMethod,
-          row.overtimePaymentMethod
+          row.overtimePaymentMethod,
         ),
         actor.updateEmployee(activeCompany, empId, row.employee.name, wageRate),
       ]);
@@ -1319,7 +1539,7 @@ export default function App() {
   function handleHoursChange(employeeId: string, value: string) {
     setRows((prev) => {
       const updated = prev.map((r) =>
-        r.employee.id !== employeeId ? r : { ...r, localHours: value }
+        r.employee.id !== employeeId ? r : { ...r, localHours: value },
       );
       const row = updated.find((r) => r.employee.id === employeeId);
       if (row) scheduleSave(row);
@@ -1335,7 +1555,7 @@ export default function App() {
   function handleWageRateChange(employeeId: string, value: string) {
     setRows((prev) => {
       const updated = prev.map((r) =>
-        r.employee.id !== employeeId ? r : { ...r, localWageRate: value }
+        r.employee.id !== employeeId ? r : { ...r, localWageRate: value },
       );
       const row = updated.find((r) => r.employee.id === employeeId);
       if (row) scheduleSave(row);
@@ -1351,7 +1571,7 @@ export default function App() {
   function handleTipsChange(employeeId: string, value: string) {
     setRows((prev) => {
       const updated = prev.map((r) =>
-        r.employee.id !== employeeId ? r : { ...r, localTips: value }
+        r.employee.id !== employeeId ? r : { ...r, localTips: value },
       );
       const row = updated.find((r) => r.employee.id === employeeId);
       if (row) scheduleSave(row);
@@ -1367,7 +1587,7 @@ export default function App() {
   function handleOvertimeHoursChange(employeeId: string, value: string) {
     setRows((prev) => {
       const updated = prev.map((r) =>
-        r.employee.id !== employeeId ? r : { ...r, localOvertimeHours: value }
+        r.employee.id !== employeeId ? r : { ...r, localOvertimeHours: value },
       );
       const row = updated.find((r) => r.employee.id === employeeId);
       if (row) scheduleSave(row);
@@ -1383,7 +1603,9 @@ export default function App() {
   function handleOvertimeWageRateChange(employeeId: string, value: string) {
     setRows((prev) => {
       const updated = prev.map((r) =>
-        r.employee.id !== employeeId ? r : { ...r, localOvertimeWageRate: value }
+        r.employee.id !== employeeId
+          ? r
+          : { ...r, localOvertimeWageRate: value },
       );
       const row = updated.find((r) => r.employee.id === employeeId);
       if (row) scheduleSave(row);
@@ -1405,9 +1627,10 @@ export default function App() {
           isStudent: checked,
           localHours: checked ? "80" : r.localHours,
           // Default overtime wage rate to employee's wage rate when first enabling
-          localOvertimeWageRate: checked && r.localOvertimeWageRate === "0"
-            ? r.localWageRate
-            : r.localOvertimeWageRate,
+          localOvertimeWageRate:
+            checked && r.localOvertimeWageRate === "0"
+              ? r.localWageRate
+              : r.localOvertimeWageRate,
         };
       });
       const row = updated.find((r) => r.employee.id === employeeId);
@@ -1431,7 +1654,9 @@ export default function App() {
   function handleFixedSalaryAmountChange(employeeId: string, value: string) {
     setRows((prev) => {
       const updated = prev.map((r) =>
-        r.employee.id !== employeeId ? r : { ...r, localFixedSalaryAmount: value }
+        r.employee.id !== employeeId
+          ? r
+          : { ...r, localFixedSalaryAmount: value },
       );
       const row = updated.find((r) => r.employee.id === employeeId);
       if (row) scheduleSave(row);
@@ -1448,7 +1673,11 @@ export default function App() {
     setRows((prev) => {
       const updated = prev.map((r) => {
         if (r.employee.id !== employeeId) return r;
-        return { ...r, paymentMethod: r.paymentMethod === "cash" ? "bank" : "cash" as "cash" | "bank" };
+        return {
+          ...r,
+          paymentMethod:
+            r.paymentMethod === "cash" ? "bank" : ("cash" as "cash" | "bank"),
+        };
       });
       const row = updated.find((r) => r.employee.id === employeeId);
       if (row) persistRow(row);
@@ -1460,7 +1689,13 @@ export default function App() {
     setRows((prev) => {
       const updated = prev.map((r) => {
         if (r.employee.id !== employeeId) return r;
-        return { ...r, overtimePaymentMethod: r.overtimePaymentMethod === "cash" ? "bank" : "cash" as "cash" | "bank" };
+        return {
+          ...r,
+          overtimePaymentMethod:
+            r.overtimePaymentMethod === "cash"
+              ? "bank"
+              : ("cash" as "cash" | "bank"),
+        };
       });
       const row = updated.find((r) => r.employee.id === employeeId);
       if (row) persistRow(row);
@@ -1470,7 +1705,10 @@ export default function App() {
 
   // ── Quick Entry update ─────────────────────
 
-  function handleQuickEntryUpdate(employeeId: string, update: QuickEntryUpdate) {
+  function handleQuickEntryUpdate(
+    employeeId: string,
+    update: QuickEntryUpdate,
+  ) {
     setRows((prev) => {
       const updated = prev.map((r) => {
         if (r.employee.id !== employeeId) return r;
@@ -1501,7 +1739,20 @@ export default function App() {
     const entryId = crypto.randomUUID();
     try {
       await actor.createEmployee(activeCompany, empId, name, wageRate);
-      await actor.createPayrollEntry(activeCompany, entryId, empId, 0, 0, false, 0, wageRate, false, 0, "bank", "bank");
+      await actor.createPayrollEntry(
+        activeCompany,
+        entryId,
+        empId,
+        0,
+        0,
+        false,
+        0,
+        wageRate,
+        false,
+        0,
+        "bank",
+        "bank",
+      );
       const newEmployee: Employee = { id: empId, name, wageRate };
       const newEntry: PayrollEntry = {
         id: entryId,
@@ -1554,7 +1805,12 @@ export default function App() {
   async function handleEditEmployee(name: string, wageRate: number) {
     if (!actor || !editingEmployeeId) return;
     try {
-      await actor.updateEmployee(activeCompany, editingEmployeeId, name, wageRate);
+      await actor.updateEmployee(
+        activeCompany,
+        editingEmployeeId,
+        name,
+        wageRate,
+      );
       setRows((prev) =>
         prev.map((r) => {
           if (r.employee.id !== editingEmployeeId) return r;
@@ -1563,7 +1819,7 @@ export default function App() {
             employee: { ...r.employee, name, wageRate },
             localWageRate: String(wageRate),
           };
-        })
+        }),
       );
       toast.success(`${name} updated`);
     } catch (err) {
@@ -1585,12 +1841,18 @@ export default function App() {
     setDeleteInProgress(true);
     const row = rows.find((r) => r.employee.id === deletingEmployeeId);
     try {
-      const deleteOps: Promise<void>[] = [actor.deleteEmployee(activeCompany, deletingEmployeeId)];
+      const deleteOps: Promise<void>[] = [
+        actor.deleteEmployee(activeCompany, deletingEmployeeId),
+      ];
       if (row?.payrollEntry) {
-        deleteOps.push(actor.deletePayrollEntry(activeCompany, row.payrollEntry.id));
+        deleteOps.push(
+          actor.deletePayrollEntry(activeCompany, row.payrollEntry.id),
+        );
       }
       await Promise.all(deleteOps);
-      setRows((prev) => prev.filter((r) => r.employee.id !== deletingEmployeeId));
+      setRows((prev) =>
+        prev.filter((r) => r.employee.id !== deletingEmployeeId),
+      );
       toast.success(`${row?.employee.name ?? "Employee"} removed`);
     } catch (err) {
       console.error(err);
@@ -1606,20 +1868,26 @@ export default function App() {
 
   const computedTotalWages = rows.reduce((sum, r) => {
     if (r.isFixedSalary) {
-      return sum + (parseFloat(r.localFixedSalaryAmount) || 0);
+      return sum + (Number.parseFloat(r.localFixedSalaryAmount) || 0);
     }
-    const hours = r.isStudent ? 80 : parseFloat(r.localHours) || 0;
-    return sum + hours * (parseFloat(r.localWageRate) || 0);
+    const hours = r.isStudent ? 80 : Number.parseFloat(r.localHours) || 0;
+    return sum + hours * (Number.parseFloat(r.localWageRate) || 0);
   }, 0);
 
-  const computedTotalTips = rows.reduce((sum, r) => sum + (parseFloat(r.localTips) || 0), 0);
+  const computedTotalTips = rows.reduce(
+    (sum, r) => sum + (Number.parseFloat(r.localTips) || 0),
+    0,
+  );
 
   const computedTotalOvertime = rows.reduce((sum, r) => {
     if (!r.isStudent) return sum;
-    return sum + calcOvertimeTotal(r.localOvertimeHours, r.localOvertimeWageRate);
+    return (
+      sum + calcOvertimeTotal(r.localOvertimeHours, r.localOvertimeWageRate)
+    );
   }, 0);
 
-  const computedGrandTotal = computedTotalWages + computedTotalTips + computedTotalOvertime;
+  const computedGrandTotal =
+    computedTotalWages + computedTotalTips + computedTotalOvertime;
 
   const computedCashTotal = computedCashTotalFromRows(rows);
 
@@ -1631,9 +1899,10 @@ export default function App() {
     try {
       // Save current period before clearing
       const periodId = crypto.randomUUID();
-      const label = periodStart && periodEnd
-        ? formatPeriodLabel(periodStart, periodEnd)
-        : `Cleared ${formatDateUK(todayISO())}`;
+      const label =
+        periodStart && periodEnd
+          ? formatPeriodLabel(periodStart, periodEnd)
+          : `Cleared ${formatDateUK(todayISO())}`;
 
       await actor.savePayPeriod(
         activeCompany,
@@ -1646,7 +1915,7 @@ export default function App() {
         computedTotalOvertime,
         computedGrandTotal,
         computedCashTotal,
-        BigInt(rows.length)
+        BigInt(rows.length),
       );
 
       // Clear all entries
@@ -1656,11 +1925,26 @@ export default function App() {
       const newEntries = await Promise.all(
         rows.map(async (row) => {
           const id = crypto.randomUUID();
-          await actor.createPayrollEntry(activeCompany, id, row.employee.id, 0, 0, false, 0, row.employee.wageRate, false, 0, "bank", "bank");
+          await actor.createPayrollEntry(
+            activeCompany,
+            id,
+            row.employee.id,
+            0,
+            0,
+            false,
+            0,
+            row.employee.wageRate,
+            false,
+            0,
+            "bank",
+            "bank",
+          );
           return { employeeId: row.employee.id, entryId: id };
-        })
+        }),
       );
-      const entryMap = new Map(newEntries.map((e) => [e.employeeId, e.entryId]));
+      const entryMap = new Map(
+        newEntries.map((e) => [e.employeeId, e.entryId]),
+      );
 
       setRows((prev) =>
         prev.map((r) => ({
@@ -1691,7 +1975,7 @@ export default function App() {
           overtimePaymentMethod: "bank" as "cash" | "bank",
           saving: false,
           savedAt: null,
-        }))
+        })),
       );
 
       // Refresh latest period
@@ -1750,7 +2034,10 @@ export default function App() {
       <Toaster position="top-right" richColors />
 
       {/* ── Header ── */}
-      <header className="no-print border-b border-border shadow-xs" style={{ backgroundColor: company.headerBg }}>
+      <header
+        className="no-print border-b border-border shadow-xs"
+        style={{ backgroundColor: company.headerBg }}
+      >
         <div className="mx-auto max-w-7xl px-4 py-4 sm:px-6">
           <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
             <div className="flex items-center gap-3">
@@ -1764,21 +2051,36 @@ export default function App() {
               >
                 <ArrowLeft className="h-4 w-4" />
               </Button>
-              <div className="flex h-9 w-9 items-center justify-center rounded-md" style={{ backgroundColor: "rgba(255,255,255,0.15)" }}>
-                <Banknote className="h-5 w-5" style={{ color: company.primaryFg }} />
+              <div
+                className="flex h-9 w-9 items-center justify-center rounded-md"
+                style={{ backgroundColor: "rgba(255,255,255,0.15)" }}
+              >
+                <Banknote
+                  className="h-5 w-5"
+                  style={{ color: company.primaryFg }}
+                />
               </div>
               <div>
-                <h1 className="text-lg font-bold tracking-tight leading-tight" style={{ color: company.primaryFg }}>
+                <h1
+                  className="text-lg font-bold tracking-tight leading-tight"
+                  style={{ color: company.primaryFg }}
+                >
                   {company.name}
                 </h1>
-                <p className="text-xs font-medium tracking-wide uppercase leading-tight" style={{ color: `${company.primaryFg}99` }}>
+                <p
+                  className="text-xs font-medium tracking-wide uppercase leading-tight"
+                  style={{ color: `${company.primaryFg}99` }}
+                >
                   {company.subtitle}
                 </p>
               </div>
             </div>
 
             <div className="flex flex-wrap items-center gap-2">
-              <CompanySwitcher activeCompany={activeCompany} onSwitch={handleCompanySwitch} />
+              <CompanySwitcher
+                activeCompany={activeCompany}
+                onSwitch={handleCompanySwitch}
+              />
             </div>
 
             <div className="flex flex-wrap items-center gap-2 action-buttons">
@@ -1786,7 +2088,11 @@ export default function App() {
                 onClick={() => setAddDialogOpen(true)}
                 className="gap-1.5 min-h-[44px]"
                 size="sm"
-                style={{ backgroundColor: "rgba(255,255,255,0.2)", color: company.primaryFg, borderColor: "rgba(255,255,255,0.3)" }}
+                style={{
+                  backgroundColor: "rgba(255,255,255,0.2)",
+                  color: company.primaryFg,
+                  borderColor: "rgba(255,255,255,0.3)",
+                }}
                 variant="outline"
               >
                 <Plus className="h-4 w-4" />
@@ -1796,7 +2102,11 @@ export default function App() {
                 variant="outline"
                 size="sm"
                 className="gap-1.5 min-h-[44px]"
-                style={{ backgroundColor: "rgba(255,255,255,0.1)", color: company.primaryFg, borderColor: "rgba(255,255,255,0.25)" }}
+                style={{
+                  backgroundColor: "rgba(255,255,255,0.1)",
+                  color: company.primaryFg,
+                  borderColor: "rgba(255,255,255,0.25)",
+                }}
                 onClick={() => setClearConfirmOpen(true)}
               >
                 <RefreshCw className="h-4 w-4" />
@@ -1806,8 +2116,19 @@ export default function App() {
                 variant="outline"
                 size="sm"
                 className="gap-1.5 min-h-[44px]"
-                style={{ backgroundColor: "rgba(255,255,255,0.1)", color: company.primaryFg, borderColor: "rgba(255,255,255,0.25)" }}
-                onClick={() => printAccountantPDF(displayRows, periodStart, periodEnd, company)}
+                style={{
+                  backgroundColor: "rgba(255,255,255,0.1)",
+                  color: company.primaryFg,
+                  borderColor: "rgba(255,255,255,0.25)",
+                }}
+                onClick={() =>
+                  printAccountantPDF(
+                    displayRows,
+                    periodStart,
+                    periodEnd,
+                    company,
+                  )
+                }
               >
                 <BookOpen className="h-4 w-4" />
                 Accountant PDF
@@ -1816,7 +2137,11 @@ export default function App() {
                 variant="outline"
                 size="sm"
                 className="gap-1.5 min-h-[44px]"
-                style={{ backgroundColor: "rgba(255,255,255,0.1)", color: company.primaryFg, borderColor: "rgba(255,255,255,0.25)" }}
+                style={{
+                  backgroundColor: "rgba(255,255,255,0.1)",
+                  color: company.primaryFg,
+                  borderColor: "rgba(255,255,255,0.25)",
+                }}
                 onClick={() =>
                   printFullSummaryPDF(
                     displayRows,
@@ -1827,12 +2152,38 @@ export default function App() {
                     computedCashTotal,
                     periodStart,
                     periodEnd,
-                    company
+                    company,
                   )
                 }
               >
                 <FileText className="h-4 w-4" />
                 Full Summary PDF
+              </Button>
+              <Button
+                variant="outline"
+                size="sm"
+                className="gap-1.5 min-h-[44px]"
+                style={{
+                  backgroundColor: "rgba(255,255,255,0.1)",
+                  color: company.primaryFg,
+                  borderColor: "rgba(255,255,255,0.25)",
+                }}
+                onClick={() =>
+                  printTipsPDF(
+                    displayRows,
+                    computedTotalWages,
+                    computedTotalTips,
+                    computedTotalOvertime,
+                    computedGrandTotal,
+                    computedCashTotal,
+                    periodStart,
+                    periodEnd,
+                    company,
+                  )
+                }
+              >
+                <Coins className="h-4 w-4" />
+                Tips PDF
               </Button>
             </div>
           </div>
@@ -1860,7 +2211,10 @@ export default function App() {
           <div className="flex flex-wrap items-end gap-4">
             <Calendar className="h-4 w-4 text-muted-foreground self-center mt-4 hidden sm:block" />
             <div className="flex flex-col gap-1.5">
-              <Label htmlFor="period-start" className="text-xs font-medium text-muted-foreground uppercase tracking-wide">
+              <Label
+                htmlFor="period-start"
+                className="text-xs font-medium text-muted-foreground uppercase tracking-wide"
+              >
                 Period From
               </Label>
               <Input
@@ -1873,7 +2227,10 @@ export default function App() {
               />
             </div>
             <div className="flex flex-col gap-1.5">
-              <Label htmlFor="period-end" className="text-xs font-medium text-muted-foreground uppercase tracking-wide">
+              <Label
+                htmlFor="period-end"
+                className="text-xs font-medium text-muted-foreground uppercase tracking-wide"
+              >
                 Period To
               </Label>
               <Input
@@ -1929,28 +2286,25 @@ export default function App() {
                     </div>
                   </TableHead>
                   <TableHead className="w-[120px] text-right font-semibold text-foreground">
-                    Hours
+                    Wage Rate
                   </TableHead>
                   <TableHead className="w-[120px] text-right font-semibold text-foreground">
-                    Wage Rate
+                    Hours
+                  </TableHead>
+                  <TableHead className="w-[90px] text-center font-semibold text-foreground">
+                    Fixed
+                  </TableHead>
+                  <TableHead className="w-[100px] text-center font-semibold text-foreground">
+                    Student
+                  </TableHead>
+                  <TableHead className="w-[90px] text-center font-semibold text-foreground">
+                    Payment
                   </TableHead>
                   <TableHead className="w-[130px] text-right font-semibold text-foreground">
                     Total Wages
                   </TableHead>
                   <TableHead className="w-[120px] text-right font-semibold text-foreground">
                     Tips Earned
-                  </TableHead>
-                  <TableHead className="w-[130px] text-right font-semibold text-foreground">
-                    Individual Total
-                  </TableHead>
-                  <TableHead className="w-[90px] text-center font-semibold text-foreground">
-                    Fixed
-                  </TableHead>
-                  <TableHead className="w-[90px] text-center font-semibold text-foreground">
-                    Payment
-                  </TableHead>
-                  <TableHead className="w-[100px] text-center font-semibold text-foreground">
-                    Student
                   </TableHead>
                   <TableHead className="w-[110px] text-center font-semibold text-foreground no-print">
                     Actions
@@ -1961,7 +2315,17 @@ export default function App() {
                 {loading ? (
                   ["sk-1", "sk-2", "sk-3"].map((skKey) => (
                     <TableRow key={skKey}>
-                      {["c1", "c2", "c3", "c4", "c5", "c6", "c7", "c8", "c9", "c10"].map((cKey) => (
+                      {[
+                        "c1",
+                        "c2",
+                        "c3",
+                        "c4",
+                        "c5",
+                        "c6",
+                        "c7",
+                        "c8",
+                        "c9",
+                      ].map((cKey) => (
                         <TableCell key={cKey}>
                           <Skeleton className="h-9 w-full" />
                         </TableCell>
@@ -1970,25 +2334,31 @@ export default function App() {
                   ))
                 ) : rows.length === 0 ? (
                   <TableRow>
-                    <TableCell colSpan={10} className="py-16 text-center">
+                    <TableCell colSpan={9} className="py-16 text-center">
                       <div className="flex flex-col items-center gap-3 text-muted-foreground">
                         <Users className="h-10 w-10 opacity-30" />
                         <div>
                           <p className="font-medium">No employees yet</p>
-                          <p className="text-sm">Click "Add Employee" to get started</p>
+                          <p className="text-sm">
+                            Click "Add Employee" to get started
+                          </p>
                         </div>
                       </div>
                     </TableCell>
                   </TableRow>
                 ) : (
                   displayRows.map((row) => {
-                    const hours = row.isStudent ? 80 : parseFloat(row.localHours) || 0;
+                    const hours = row.isStudent
+                      ? 80
+                      : Number.parseFloat(row.localHours) || 0;
                     const totalWagesRow = row.isFixedSalary
-                      ? parseFloat(row.localFixedSalaryAmount) || 0
-                      : hours * (parseFloat(row.localWageRate) || 0);
-                    const individualTotal = calcIndividualTotal(row);
+                      ? Number.parseFloat(row.localFixedSalaryAmount) || 0
+                      : hours * (Number.parseFloat(row.localWageRate) || 0);
                     const overtimeTotal = row.isStudent
-                      ? calcOvertimeTotal(row.localOvertimeHours, row.localOvertimeWageRate)
+                      ? calcOvertimeTotal(
+                          row.localOvertimeHours,
+                          row.localOvertimeWageRate,
+                        )
                       : 0;
 
                     return (
@@ -2001,12 +2371,18 @@ export default function App() {
                                 {row.employee.name}
                               </span>
                               {row.isStudent && (
-                                <Badge variant="secondary" className="text-[10px] px-1.5 py-0 font-semibold bg-blue-100 text-blue-700 border-blue-200">
+                                <Badge
+                                  variant="secondary"
+                                  className="text-[10px] px-1.5 py-0 font-semibold bg-blue-100 text-blue-700 border-blue-200"
+                                >
                                   Student
                                 </Badge>
                               )}
                               {row.isFixedSalary && (
-                                <Badge variant="secondary" className="text-[10px] px-1.5 py-0 font-semibold bg-amber-100 text-amber-700 border-amber-200">
+                                <Badge
+                                  variant="secondary"
+                                  className="text-[10px] px-1.5 py-0 font-semibold bg-amber-100 text-amber-700 border-amber-200"
+                                >
                                   Fixed
                                 </Badge>
                               )}
@@ -2019,6 +2395,34 @@ export default function App() {
                             </div>
                           </TableCell>
 
+                          {/* Wage Rate */}
+                          <TableCell className="text-right">
+                            <div className="relative flex items-center justify-end">
+                              <span className="absolute left-2 text-muted-foreground text-xs pointer-events-none">
+                                £
+                              </span>
+                              <input
+                                type="number"
+                                className="table-input"
+                                min="0"
+                                step="0.01"
+                                value={row.localWageRate}
+                                disabled={row.isFixedSalary}
+                                onChange={(e) =>
+                                  handleWageRateChange(
+                                    row.employee.id,
+                                    e.target.value,
+                                  )
+                                }
+                                onBlur={() =>
+                                  handleWageRateBlur(row.employee.id)
+                                }
+                                aria-label={`Wage rate for ${row.employee.name}`}
+                                style={{ fontSize: "16px" }}
+                              />
+                            </div>
+                          </TableCell>
+
                           {/* Hours Worked */}
                           <TableCell className="text-right">
                             <input
@@ -2028,28 +2432,61 @@ export default function App() {
                               step="0.5"
                               value={row.localHours}
                               disabled={row.isStudent || row.isFixedSalary}
-                              onChange={(e) => handleHoursChange(row.employee.id, e.target.value)}
+                              onChange={(e) =>
+                                handleHoursChange(
+                                  row.employee.id,
+                                  e.target.value,
+                                )
+                              }
                               onBlur={() => handleHoursBlur(row.employee.id)}
                               aria-label={`Hours worked for ${row.employee.name}`}
                               style={{ fontSize: "16px" }}
                             />
                           </TableCell>
 
-                          {/* Wage Rate */}
-                          <TableCell className="text-right">
-                            <div className="relative flex items-center justify-end">
-                              <span className="absolute left-2 text-muted-foreground text-xs pointer-events-none">£</span>
-                              <input
-                                type="number"
-                                className="table-input"
-                                min="0"
-                                step="0.01"
-                                value={row.localWageRate}
-                                disabled={row.isFixedSalary}
-                                onChange={(e) => handleWageRateChange(row.employee.id, e.target.value)}
-                                onBlur={() => handleWageRateBlur(row.employee.id)}
-                                aria-label={`Wage rate for ${row.employee.name}`}
-                                style={{ fontSize: "16px" }}
+                          {/* Fixed Salary Checkbox */}
+                          <TableCell className="text-center">
+                            <div className="flex items-center justify-center">
+                              <Checkbox
+                                checked={row.isFixedSalary}
+                                onCheckedChange={(checked) =>
+                                  handleFixedSalaryToggle(
+                                    row.employee.id,
+                                    checked === true,
+                                  )
+                                }
+                                aria-label={`Mark ${row.employee.name} as fixed salary`}
+                                className="h-5 w-5"
+                              />
+                            </div>
+                          </TableCell>
+
+                          {/* Student Checkbox */}
+                          <TableCell className="text-center">
+                            <div className="flex items-center justify-center">
+                              <Checkbox
+                                checked={row.isStudent}
+                                onCheckedChange={(checked) =>
+                                  handleStudentToggle(
+                                    row.employee.id,
+                                    checked === true,
+                                  )
+                                }
+                                aria-label={`Mark ${row.employee.name} as student`}
+                                className="h-5 w-5"
+                              />
+                            </div>
+                          </TableCell>
+
+                          {/* Payment Method Toggle */}
+                          <TableCell className="text-center">
+                            <div className="flex items-center justify-center">
+                              <PaymentToggle
+                                value={row.paymentMethod}
+                                onChange={() =>
+                                  handlePaymentMethodToggle(row.employee.id)
+                                }
+                                label={`Payment method for ${row.employee.name}`}
                               />
                             </div>
                           </TableCell>
@@ -2058,15 +2495,24 @@ export default function App() {
                           <TableCell className="text-right">
                             {row.isFixedSalary ? (
                               <div className="relative flex items-center justify-end">
-                                <span className="absolute left-2 text-amber-500 text-xs pointer-events-none">£</span>
+                                <span className="absolute left-2 text-amber-500 text-xs pointer-events-none">
+                                  £
+                                </span>
                                 <input
                                   type="number"
                                   className="table-input text-amber-700"
                                   min="0"
                                   step="0.01"
                                   value={row.localFixedSalaryAmount}
-                                  onChange={(e) => handleFixedSalaryAmountChange(row.employee.id, e.target.value)}
-                                  onBlur={() => handleFixedSalaryAmountBlur(row.employee.id)}
+                                  onChange={(e) =>
+                                    handleFixedSalaryAmountChange(
+                                      row.employee.id,
+                                      e.target.value,
+                                    )
+                                  }
+                                  onBlur={() =>
+                                    handleFixedSalaryAmountBlur(row.employee.id)
+                                  }
                                   aria-label={`Fixed salary amount for ${row.employee.name}`}
                                   style={{ fontSize: "16px" }}
                                   placeholder="0.00"
@@ -2082,63 +2528,24 @@ export default function App() {
                           {/* Tips Earned */}
                           <TableCell className="text-right">
                             <div className="relative flex items-center justify-end">
-                              <span className="absolute left-2 text-muted-foreground text-xs pointer-events-none">£</span>
+                              <span className="absolute left-2 text-muted-foreground text-xs pointer-events-none">
+                                £
+                              </span>
                               <input
                                 type="number"
                                 className="table-input"
                                 min="0"
                                 step="0.01"
                                 value={row.localTips}
-                                onChange={(e) => handleTipsChange(row.employee.id, e.target.value)}
+                                onChange={(e) =>
+                                  handleTipsChange(
+                                    row.employee.id,
+                                    e.target.value,
+                                  )
+                                }
                                 onBlur={() => handleTipsBlur(row.employee.id)}
                                 aria-label={`Tips earned for ${row.employee.name}`}
                                 style={{ fontSize: "16px" }}
-                              />
-                            </div>
-                          </TableCell>
-
-                          {/* Individual Total */}
-                          <TableCell className="text-right">
-                            <span className="font-mono font-semibold text-foreground tabular-nums">
-                              {formatCurrency(individualTotal)}
-                            </span>
-                          </TableCell>
-
-                          {/* Fixed Salary Checkbox */}
-                          <TableCell className="text-center">
-                            <div className="flex items-center justify-center">
-                              <Checkbox
-                                checked={row.isFixedSalary}
-                                onCheckedChange={(checked) =>
-                                  handleFixedSalaryToggle(row.employee.id, checked === true)
-                                }
-                                aria-label={`Mark ${row.employee.name} as fixed salary`}
-                                className="h-5 w-5"
-                              />
-                            </div>
-                          </TableCell>
-
-                          {/* Payment Method Toggle */}
-                          <TableCell className="text-center">
-                            <div className="flex items-center justify-center">
-                              <PaymentToggle
-                                value={row.paymentMethod}
-                                onChange={() => handlePaymentMethodToggle(row.employee.id)}
-                                label={`Payment method for ${row.employee.name}`}
-                              />
-                            </div>
-                          </TableCell>
-
-                          {/* Student Checkbox */}
-                          <TableCell className="text-center">
-                            <div className="flex items-center justify-center">
-                              <Checkbox
-                                checked={row.isStudent}
-                                onCheckedChange={(checked) =>
-                                  handleStudentToggle(row.employee.id, checked === true)
-                                }
-                                aria-label={`Mark ${row.employee.name} as student`}
-                                className="h-5 w-5"
                               />
                             </div>
                           </TableCell>
@@ -2162,7 +2569,9 @@ export default function App() {
                                 variant="ghost"
                                 size="icon"
                                 className="h-9 w-9 text-muted-foreground hover:text-destructive"
-                                onClick={() => openDeleteConfirm(row.employee.id)}
+                                onClick={() =>
+                                  openDeleteConfirm(row.employee.id)
+                                }
                                 aria-label={`Delete ${row.employee.name}`}
                               >
                                 <Trash2 className="h-3.5 w-3.5" />
@@ -2173,11 +2582,41 @@ export default function App() {
 
                         {/* ── Student Overtime Sub-Row ── */}
                         {row.isStudent && (
-                          <TableRow key={`${row.employee.id}-overtime`} className="bg-blue-50/50 hover:bg-blue-50/70">
+                          <TableRow
+                            key={`${row.employee.id}-overtime`}
+                            className="bg-blue-50/50 hover:bg-blue-50/70"
+                          >
                             <TableCell className="py-2 pl-8">
                               <span className="text-xs font-medium text-blue-700 italic">
                                 ↳ Overtime Hours
                               </span>
+                            </TableCell>
+                            {/* Overtime Wage Rate */}
+                            <TableCell className="py-2 text-right">
+                              <div className="relative flex items-center justify-end">
+                                <span className="absolute left-2 text-blue-400 text-xs pointer-events-none">
+                                  £
+                                </span>
+                                <input
+                                  type="number"
+                                  className="table-input text-blue-700"
+                                  min="0"
+                                  step="0.01"
+                                  value={row.localOvertimeWageRate}
+                                  onChange={(e) =>
+                                    handleOvertimeWageRateChange(
+                                      row.employee.id,
+                                      e.target.value,
+                                    )
+                                  }
+                                  onBlur={() =>
+                                    handleOvertimeWageRateBlur(row.employee.id)
+                                  }
+                                  aria-label={`Overtime wage rate for ${row.employee.name}`}
+                                  style={{ fontSize: "16px" }}
+                                  placeholder="0.00"
+                                />
+                              </div>
                             </TableCell>
                             {/* Overtime Hours */}
                             <TableCell className="py-2 text-right">
@@ -2187,28 +2626,35 @@ export default function App() {
                                 min="0"
                                 step="0.5"
                                 value={row.localOvertimeHours}
-                                onChange={(e) => handleOvertimeHoursChange(row.employee.id, e.target.value)}
-                                onBlur={() => handleOvertimeHoursBlur(row.employee.id)}
+                                onChange={(e) =>
+                                  handleOvertimeHoursChange(
+                                    row.employee.id,
+                                    e.target.value,
+                                  )
+                                }
+                                onBlur={() =>
+                                  handleOvertimeHoursBlur(row.employee.id)
+                                }
                                 aria-label={`Overtime hours for ${row.employee.name}`}
                                 style={{ fontSize: "16px" }}
                                 placeholder="0"
                               />
                             </TableCell>
-                            {/* Overtime Wage Rate */}
-                            <TableCell className="py-2 text-right">
-                              <div className="relative flex items-center justify-end">
-                                <span className="absolute left-2 text-blue-400 text-xs pointer-events-none">£</span>
-                                <input
-                                  type="number"
-                                  className="table-input text-blue-700"
-                                  min="0"
-                                  step="0.01"
-                                  value={row.localOvertimeWageRate}
-                                  onChange={(e) => handleOvertimeWageRateChange(row.employee.id, e.target.value)}
-                                  onBlur={() => handleOvertimeWageRateBlur(row.employee.id)}
-                                  aria-label={`Overtime wage rate for ${row.employee.name}`}
-                                  style={{ fontSize: "16px" }}
-                                  placeholder="0.00"
+                            {/* Empty fixed cell */}
+                            <TableCell className="py-2" />
+                            {/* Empty student cell */}
+                            <TableCell className="py-2" />
+                            {/* Overtime Payment Method */}
+                            <TableCell className="py-2 text-center">
+                              <div className="flex items-center justify-center">
+                                <PaymentToggle
+                                  value={row.overtimePaymentMethod}
+                                  onChange={() =>
+                                    handleOvertimePaymentMethodToggle(
+                                      row.employee.id,
+                                    )
+                                  }
+                                  label={`Overtime payment method for ${row.employee.name}`}
                                 />
                               </div>
                             </TableCell>
@@ -2219,22 +2665,6 @@ export default function App() {
                               </span>
                             </TableCell>
                             {/* Empty tips cell */}
-                            <TableCell className="py-2" />
-                            {/* Empty individual total cell */}
-                            <TableCell className="py-2" />
-                            {/* Empty fixed cell */}
-                            <TableCell className="py-2" />
-                            {/* Overtime Payment Method */}
-                            <TableCell className="py-2 text-center">
-                              <div className="flex items-center justify-center">
-                                <PaymentToggle
-                                  value={row.overtimePaymentMethod}
-                                  onChange={() => handleOvertimePaymentMethodToggle(row.employee.id)}
-                                  label={`Overtime payment method for ${row.employee.name}`}
-                                />
-                              </div>
-                            </TableCell>
-                            {/* Empty student cell */}
                             <TableCell className="py-2" />
                             {/* Empty actions cell */}
                             <TableCell className="py-2 no-print" />
@@ -2306,7 +2736,9 @@ export default function App() {
       {/* ── Footer ── */}
       <footer className="app-footer no-print mt-10 border-t border-border py-6 text-center text-xs text-muted-foreground">
         © 2026. Built with{" "}
-        <span className="text-destructive" role="img" aria-label="love">♥</span>{" "}
+        <span className="text-destructive" role="img" aria-label="love">
+          ♥
+        </span>{" "}
         using{" "}
         <a
           href="https://caffeine.ai"
@@ -2350,13 +2782,17 @@ export default function App() {
             </AlertDialogDescription>
           </AlertDialogHeader>
           <AlertDialogFooter>
-            <AlertDialogCancel disabled={deleteInProgress}>Cancel</AlertDialogCancel>
+            <AlertDialogCancel disabled={deleteInProgress}>
+              Cancel
+            </AlertDialogCancel>
             <AlertDialogAction
               onClick={handleDeleteEmployee}
               disabled={deleteInProgress}
               className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
             >
-              {deleteInProgress ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : null}
+              {deleteInProgress ? (
+                <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+              ) : null}
               {deleteInProgress ? "Deleting…" : "Delete"}
             </AlertDialogAction>
           </AlertDialogFooter>
@@ -2381,12 +2817,16 @@ export default function App() {
             </AlertDialogDescription>
           </AlertDialogHeader>
           <AlertDialogFooter>
-            <AlertDialogCancel disabled={clearInProgress}>Cancel</AlertDialogCancel>
+            <AlertDialogCancel disabled={clearInProgress}>
+              Cancel
+            </AlertDialogCancel>
             <AlertDialogAction
               onClick={handleClearPayPeriod}
               disabled={clearInProgress}
             >
-              {clearInProgress ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : null}
+              {clearInProgress ? (
+                <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+              ) : null}
               {clearInProgress ? "Saving…" : "Save & Clear"}
             </AlertDialogAction>
           </AlertDialogFooter>
