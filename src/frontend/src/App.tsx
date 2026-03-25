@@ -539,6 +539,99 @@ function printTipsPDF(
   setTimeout(() => win.print(), 500);
 }
 
+function printCashTransactionsPDF(
+  rows: PayrollRow[],
+  startDate: string,
+  endDate: string,
+  co: CompanyConfig,
+) {
+  const overtimeRows = rows
+    .filter(
+      (row) =>
+        row.isStudent &&
+        row.overtimePaymentMethod === "cash" &&
+        (Number.parseFloat(row.localOvertimeHours) || 0) > 0,
+    )
+    .sort((a, b) => a.employee.name.localeCompare(b.employee.name));
+
+  if (overtimeRows.length === 0) {
+    toast.error("No cash overtime transactions this period.");
+    return;
+  }
+
+  const periodLabel =
+    startDate && endDate
+      ? `Period: ${formatPeriodLabel(startDate, endDate)}`
+      : `Date: ${formatDateUK(todayISO())}`;
+
+  const tableRows = overtimeRows
+    .map((row) => {
+      const otHrs = Number.parseFloat(row.localOvertimeHours) || 0;
+      const otRate = Number.parseFloat(row.localOvertimeWageRate) || 0;
+      const otTotal = otHrs * otRate;
+      return `
+        <tr>
+          <td>${row.employee.name}</td>
+          <td style="text-align:center;">${otHrs}h</td>
+          <td style="text-align:center;">\u00a3${otRate.toFixed(2)}/h</td>
+          <td style="text-align:center;">\u00a3${otTotal.toFixed(2)}</td>
+        </tr>`;
+    })
+    .join("");
+
+  const html = `<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <title>${co.name} — Cash Transactions</title>
+  <style>
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+    body { font-family: Arial, sans-serif; font-size: 12px; color: #1a1008; background: #fff; padding: 32px; }
+    .header { border-bottom: 2px solid ${co.pdfPrimary}; padding-bottom: 16px; margin-bottom: 20px; }
+    h1 { font-size: 18px; font-weight: bold; color: ${co.pdfPrimary}; }
+    h2 { font-size: 14px; font-weight: 600; color: ${co.pdfAccent}; margin-top: 4px; }
+    .period { font-size: 12px; color: ${co.accent}; margin-top: 8px; }
+    table { width: 100%; border-collapse: collapse; margin-bottom: 24px; }
+    th, td { border: 1px solid ${co.pdfBorder}; padding: 8px 10px; text-align: left; }
+    th { background: ${co.pdfPrimary}; color: ${co.primaryFg}; font-size: 10px; text-transform: uppercase; letter-spacing: 0.06em; }
+    tr:nth-child(even) td { background: ${co.pdfEven}; }
+    .footer { margin-top: 24px; font-size: 10px; color: ${co.accent}; text-align: center; border-top: 1px solid ${co.pdfBorder}; padding-top: 12px; }
+  </style>
+</head>
+<body>
+  <div class="header">
+    <h1>${co.name}</h1>
+    <h2>Cash Transactions</h2>
+    <p class="period">${periodLabel}</p>
+  </div>
+  <table>
+    <thead>
+      <tr>
+        <th>Employee Name</th>
+        <th style="text-align:center;">Overtime Hours</th>
+        <th style="text-align:center;">Wage Rate</th>
+        <th style="text-align:center;">Total Amount</th>
+      </tr>
+    </thead>
+    <tbody>
+      ${tableRows}
+    </tbody>
+  </table>
+  <div class="footer">${co.name} Wages Management — Confidential</div>
+</body>
+</html>`;
+
+  const win = window.open("", "_blank");
+  if (!win) {
+    toast.error("Pop-up blocked. Please allow pop-ups to generate PDFs.");
+    return;
+  }
+  win.document.write(html);
+  win.document.close();
+  win.focus();
+  setTimeout(() => win.print(), 500);
+}
+
 // ─────────────────────────────────────────────
 // Payment Method Toggle Button
 // ─────────────────────────────────────────────
@@ -1377,8 +1470,8 @@ export default function App() {
       new Promise<void>((res) => setTimeout(res, ms));
     let lastErr: unknown;
 
-    for (let attempt = 0; attempt < 3; attempt++) {
-      if (attempt > 0) await delay(attempt * 1500);
+    for (let attempt = 0; attempt < 6; attempt++) {
+      if (attempt > 0) await delay(Math.min(attempt * 2000, 10000));
       try {
         const [employees, entries, period] = await Promise.all([
           actor.listEmployees(activeCompany),
@@ -1459,7 +1552,9 @@ export default function App() {
 
     // All retries exhausted
     console.error("All load attempts failed:", lastErr);
-    setLoadError("Failed to load payroll data. Please try again.");
+    setLoadError(
+      "Unable to connect to server. Please check your internet connection and tap Retry.",
+    );
     setLoading(false);
     setLoadingPeriod(false);
   }, [actor, activeCompany]);
@@ -2184,6 +2279,27 @@ export default function App() {
               >
                 <Coins className="h-4 w-4" />
                 Tips PDF
+              </Button>
+              <Button
+                variant="outline"
+                size="sm"
+                className="gap-1.5 min-h-[44px]"
+                style={{
+                  backgroundColor: "rgba(255,255,255,0.1)",
+                  color: company.primaryFg,
+                  borderColor: "rgba(255,255,255,0.25)",
+                }}
+                onClick={() =>
+                  printCashTransactionsPDF(
+                    displayRows,
+                    periodStart,
+                    periodEnd,
+                    company,
+                  )
+                }
+              >
+                <Banknote className="h-4 w-4" />
+                Cash PDF
               </Button>
             </div>
           </div>
