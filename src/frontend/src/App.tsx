@@ -132,6 +132,7 @@ interface PayrollRow {
   localFixedSalaryAmount: string;
   paymentMethod: "cash" | "bank";
   overtimePaymentMethod: "cash" | "bank";
+  includeInAccountantPDF: boolean;
   saving: boolean;
   savedAt: number | null;
 }
@@ -212,9 +213,9 @@ function printAccountantPDF(
       : `Date: ${formatDateUK(todayISO())}`;
 
   // Sort alphabetically for accountant PDF
-  const sortedRows = [...rows].sort((a, b) =>
-    a.employee.name.localeCompare(b.employee.name),
-  );
+  const sortedRows = [...rows]
+    .filter((r) => r.includeInAccountantPDF)
+    .sort((a, b) => a.employee.name.localeCompare(b.employee.name));
 
   const tableRows = sortedRows
     .map((row) => {
@@ -1535,6 +1536,7 @@ export default function App() {
             paymentMethod: (entry?.paymentMethod as "cash" | "bank") || "bank",
             overtimePaymentMethod:
               (entry?.overtimePaymentMethod as "cash" | "bank") || "bank",
+            includeInAccountantPDF: true,
             saving: false,
             savedAt: null,
           };
@@ -1543,6 +1545,20 @@ export default function App() {
         setRows(newRows);
         setLoading(false);
         setLoadingPeriod(false);
+        // Save to local cache so data is available if connection fails later
+        try {
+          localStorage.setItem(
+            `payroll_cache_${activeCompany}`,
+            JSON.stringify({
+              rows: newRows.map((r) => ({
+                ...r,
+                saving: false,
+                savedAt: null,
+              })),
+              period,
+            }),
+          );
+        } catch (_) {}
         return;
       } catch (err) {
         console.error(`Load attempt ${attempt + 1} failed:`, err);
@@ -1550,11 +1566,29 @@ export default function App() {
       }
     }
 
-    // All retries exhausted
+    // All retries exhausted -- try local cache
     console.error("All load attempts failed:", lastErr);
-    setLoadError(
-      "Unable to connect to server. Please check your internet connection and tap Retry.",
-    );
+    let cached: { rows: PayrollRow[]; period: PayPeriod | null } | null = null;
+    try {
+      const raw = localStorage.getItem(`payroll_cache_${activeCompany}`);
+      if (raw) cached = JSON.parse(raw);
+    } catch (_) {}
+    if (cached && cached.rows.length > 0) {
+      setRows(
+        cached.rows.map((r: PayrollRow) => ({
+          ...r,
+          includeInAccountantPDF: r.includeInAccountantPDF ?? true,
+        })),
+      );
+      setLatestPeriod(cached.period);
+      setLoadError(
+        "Showing your last saved data (offline). Tap Retry to reconnect.",
+      );
+    } else {
+      setLoadError(
+        "Unable to connect to server. Please check your internet connection and tap Retry.",
+      );
+    }
     setLoading(false);
     setLoadingPeriod(false);
   }, [actor, activeCompany]);
@@ -1832,63 +1866,72 @@ export default function App() {
     if (!actor) return;
     const empId = crypto.randomUUID();
     const entryId = crypto.randomUUID();
-    try {
-      await actor.createEmployee(activeCompany, empId, name, wageRate);
-      await actor.createPayrollEntry(
-        activeCompany,
-        entryId,
-        empId,
-        0,
-        0,
-        false,
-        0,
-        wageRate,
-        false,
-        0,
-        "bank",
-        "bank",
-      );
-      const newEmployee: Employee = { id: empId, name, wageRate };
-      const newEntry: PayrollEntry = {
-        id: entryId,
-        employeeId: empId,
-        hoursWorked: 0,
-        tipsEarned: 0,
-        isStudent: false,
-        totalWages: 0,
-        overtimeHours: 0,
-        overtimeWageRate: wageRate,
-        overtimeTotal: 0,
-        isFixedSalary: false,
-        fixedSalaryAmount: 0,
-        paymentMethod: "bank",
-        overtimePaymentMethod: "bank",
-      };
-      setRows((prev) => [
-        ...prev,
-        {
-          employee: newEmployee,
-          payrollEntry: newEntry,
-          localHours: "0",
-          localTips: "0",
-          localWageRate: String(wageRate),
+    const delay = (ms: number) =>
+      new Promise<void>((res) => setTimeout(res, ms));
+    let lastErr: unknown;
+    for (let attempt = 0; attempt < 4; attempt++) {
+      if (attempt > 0) await delay(attempt * 2000);
+      try {
+        await actor.createEmployee(activeCompany, empId, name, wageRate);
+        await actor.createPayrollEntry(
+          activeCompany,
+          entryId,
+          empId,
+          0,
+          0,
+          false,
+          0,
+          wageRate,
+          false,
+          0,
+          "bank",
+          "bank",
+        );
+        const newEmployee: Employee = { id: empId, name, wageRate };
+        const newEntry: PayrollEntry = {
+          id: entryId,
+          employeeId: empId,
+          hoursWorked: 0,
+          tipsEarned: 0,
           isStudent: false,
-          localOvertimeHours: "0",
-          localOvertimeWageRate: String(wageRate),
+          totalWages: 0,
+          overtimeHours: 0,
+          overtimeWageRate: wageRate,
+          overtimeTotal: 0,
           isFixedSalary: false,
-          localFixedSalaryAmount: "0",
+          fixedSalaryAmount: 0,
           paymentMethod: "bank",
           overtimePaymentMethod: "bank",
-          saving: false,
-          savedAt: null,
-        },
-      ]);
-      toast.success(`${name} added successfully`);
-    } catch (err) {
-      console.error(err);
-      toast.error("Failed to add employee");
-      throw err;
+        };
+        setRows((prev) => [
+          ...prev,
+          {
+            employee: newEmployee,
+            payrollEntry: newEntry,
+            localHours: "0",
+            localTips: "0",
+            localWageRate: String(wageRate),
+            isStudent: false,
+            localOvertimeHours: "0",
+            localOvertimeWageRate: String(wageRate),
+            isFixedSalary: false,
+            localFixedSalaryAmount: "0",
+            paymentMethod: "bank",
+            overtimePaymentMethod: "bank",
+            includeInAccountantPDF: true,
+            saving: false,
+            savedAt: null,
+          },
+        ]);
+        toast.success(`${name} added successfully`);
+        return;
+      } catch (err) {
+        lastErr = err;
+        console.error(`Add employee attempt ${attempt + 1} failed:`, err);
+      }
     }
+    console.error(lastErr);
+    toast.error("Failed to add employee. Please try again.");
   }
 
   // ── Edit employee ──────────────────────────
@@ -2068,6 +2111,7 @@ export default function App() {
           localFixedSalaryAmount: "0",
           paymentMethod: "bank" as "cash" | "bank",
           overtimePaymentMethod: "bank" as "cash" | "bank",
+          includeInAccountantPDF: true,
           saving: false,
           savedAt: null,
         })),
@@ -2395,6 +2439,29 @@ export default function App() {
             <Table>
               <TableHeader>
                 <TableRow className="bg-muted/50 hover:bg-muted/50">
+                  <TableHead className="w-[50px] text-center font-semibold text-foreground no-print">
+                    <div className="flex flex-col items-center gap-0.5">
+                      <span className="text-[10px] leading-tight text-muted-foreground">
+                        Acct.
+                      </span>
+                      <Checkbox
+                        checked={
+                          displayRows.length > 0 &&
+                          displayRows.every((r) => r.includeInAccountantPDF)
+                        }
+                        onCheckedChange={(checked) => {
+                          setRows((prev) =>
+                            prev.map((r) => ({
+                              ...r,
+                              includeInAccountantPDF: !!checked,
+                            })),
+                          );
+                        }}
+                        aria-label="Select all for accountant PDF"
+                        data-ocid="acct_pdf.checkbox"
+                      />
+                    </div>
+                  </TableHead>
                   <TableHead className="w-[180px] font-semibold text-foreground">
                     <div className="flex items-center gap-1.5">
                       <Users className="h-3.5 w-3.5 text-muted-foreground" />
@@ -2432,6 +2499,7 @@ export default function App() {
                   ["sk-1", "sk-2", "sk-3"].map((skKey) => (
                     <TableRow key={skKey}>
                       {[
+                        "c0",
                         "c1",
                         "c2",
                         "c3",
@@ -2450,7 +2518,7 @@ export default function App() {
                   ))
                 ) : rows.length === 0 ? (
                   <TableRow>
-                    <TableCell colSpan={9} className="py-16 text-center">
+                    <TableCell colSpan={10} className="py-16 text-center">
                       <div className="flex flex-col items-center gap-3 text-muted-foreground">
                         <Users className="h-10 w-10 opacity-30" />
                         <div>
@@ -2480,6 +2548,26 @@ export default function App() {
                     return (
                       <>
                         <TableRow key={row.employee.id} className="payroll-row">
+                          {/* Accountant PDF inclusion checkbox */}
+                          <TableCell className="text-center no-print">
+                            <Checkbox
+                              checked={row.includeInAccountantPDF}
+                              onCheckedChange={(checked) => {
+                                setRows((prev) =>
+                                  prev.map((r) =>
+                                    r.employee.id === row.employee.id
+                                      ? {
+                                          ...r,
+                                          includeInAccountantPDF: !!checked,
+                                        }
+                                      : r,
+                                  ),
+                                );
+                              }}
+                              aria-label={`Include ${row.employee.name} in accountant PDF`}
+                              data-ocid={`acct_pdf.checkbox.${displayRows.indexOf(row) + 1}`}
+                            />
+                          </TableCell>
                           {/* Employee Name */}
                           <TableCell>
                             <div className="flex items-center gap-2 flex-wrap">
@@ -2702,6 +2790,7 @@ export default function App() {
                             key={`${row.employee.id}-overtime`}
                             className="bg-blue-50/50 hover:bg-blue-50/70"
                           >
+                            <TableCell className="py-2 no-print" />
                             <TableCell className="py-2 pl-8">
                               <span className="text-xs font-medium text-blue-700 italic">
                                 ↳ Overtime Hours
