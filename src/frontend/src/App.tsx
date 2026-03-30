@@ -291,6 +291,7 @@ function printAccountantPDF(
   win.document.write(html);
   win.document.close();
   win.focus();
+  win.onafterprint = () => win.close();
   setTimeout(() => win.print(), 500);
 }
 
@@ -461,6 +462,7 @@ function printFullSummaryPDF(
   win.document.write(html);
   win.document.close();
   win.focus();
+  win.onafterprint = () => win.close();
   setTimeout(() => win.print(), 500);
 }
 
@@ -551,6 +553,7 @@ function printTipsPDF(
   win.document.write(html);
   win.document.close();
   win.focus();
+  win.onafterprint = () => win.close();
   setTimeout(() => win.print(), 500);
 }
 
@@ -749,6 +752,7 @@ function printCashTransactionsPDF(
   win.document.write(html);
   win.document.close();
   win.focus();
+  win.onafterprint = () => win.close();
   setTimeout(() => win.print(), 500);
 }
 
