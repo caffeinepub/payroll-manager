@@ -61,15 +61,6 @@ import {
   Zap,
 } from "lucide-react";
 import { useCallback, useEffect, useRef, useState } from "react";
-import {
-  Bar,
-  BarChart,
-  CartesianGrid,
-  Tooltip as RechartsTooltip,
-  ResponsiveContainer,
-  XAxis,
-  YAxis,
-} from "recharts";
 import { toast } from "sonner";
 import type { Employee, PayPeriod, PayrollEntry } from "./backend.d.ts";
 import { useActor } from "./hooks/useActor";
@@ -143,7 +134,6 @@ interface PayrollRow {
   paymentMethod: "cash" | "bank";
   overtimePaymentMethod: "cash" | "bank";
   includeInAccountantPDF: boolean;
-  localManualCash: string;
   saving: boolean;
   savedAt: number | null;
 }
@@ -559,7 +549,6 @@ function printCashTransactionsPDF(
   startDate: string,
   endDate: string,
   co: CompanyConfig,
-  manualCashMap: Record<string, number> = {},
 ) {
   const regularCashRows = rows
     .filter((row) => row.paymentMethod === "cash")
@@ -611,15 +600,12 @@ function printCashTransactionsPDF(
         rateDisplay = `£${rate.toFixed(2)}/h`;
         totalDisplay = `£${total.toFixed(2)}${tipsNote}`;
       }
-      const manualCash = manualCashMap[row.employee.id] || 0;
-      const manualDisplay = manualCash > 0 ? `£${manualCash.toFixed(2)}` : "-";
       return `
         <tr>
           <td>${row.employee.name}</td>
           <td style="text-align:center;">${hoursDisplay}</td>
           <td style="text-align:center;">${rateDisplay}</td>
           <td style="text-align:center;">${totalDisplay}</td>
-          <td style="text-align:center;background:#fffbeb;">${manualDisplay}</td>
         </tr>`;
     })
     .join("");
@@ -629,30 +615,16 @@ function printCashTransactionsPDF(
       const otHrs = Number.parseFloat(row.localOvertimeHours) || 0;
       const otRate = Number.parseFloat(row.localOvertimeWageRate) || 0;
       const otTotal = otHrs * otRate;
-      const otManualCash = manualCashMap[row.employee.id] || 0;
-      const otManualDisplay =
-        otManualCash > 0 ? `£${otManualCash.toFixed(2)}` : "-";
       return `
         <tr>
           <td>${row.employee.name}</td>
           <td style="text-align:center;">${otHrs}h</td>
           <td style="text-align:center;">£${otRate.toFixed(2)}/h</td>
           <td style="text-align:center;">£${otTotal.toFixed(2)}</td>
-          <td style="text-align:center;background:#fffbeb;">${otManualDisplay}</td>
         </tr>`;
     })
     .join("");
 
-  const regularCalcTotal = regularCashRows.reduce((sum, row) => {
-    if (row.isFixedSalary)
-      return sum + (Number.parseFloat(row.localFixedSalaryAmount) || 0);
-    const hrs = row.isStudent ? 80 : Number.parseFloat(row.localHours) || 0;
-    return sum + hrs * (Number.parseFloat(row.localWageRate) || 0);
-  }, 0);
-  const regularManualTotal = regularCashRows.reduce(
-    (sum, row) => sum + (manualCashMap[row.employee.id] || 0),
-    0,
-  );
   const regularSection =
     regularCashRows.length > 0
       ? `<h3 style="font-size:13px; font-weight:600; color:${co.pdfPrimary}; margin-bottom:8px;">Regular Cash Wages</h3>
@@ -662,29 +634,13 @@ function printCashTransactionsPDF(
         <th>Employee Name</th>
         <th style="text-align:center;">Hours</th>
         <th style="text-align:center;">Wage Rate</th>
-        <th style="text-align:center;">Calculated Total</th>
-        <th style="text-align:center;background:#fffbeb;color:#92400e;">Manual Cash (Rounded)</th>
+        <th style="text-align:center;">Total Wages</th>
       </tr>
     </thead>
-    <tbody>${regularTableRows}
-      <tr style="font-weight:bold;background:${co.pdfEven};">
-        <td colspan="3" style="text-align:right;">Totals</td>
-        <td style="text-align:center;">£${regularCalcTotal.toFixed(2)}</td>
-        <td style="text-align:center;background:#fffbeb;color:#92400e;">£${regularManualTotal.toFixed(2)}</td>
-      </tr>
-    </tbody>
+    <tbody>${regularTableRows}</tbody>
   </table>`
       : "";
 
-  const otCalcTotal = overtimeCashRows.reduce((sum, row) => {
-    const otHrs = Number.parseFloat(row.localOvertimeHours) || 0;
-    const otRate = Number.parseFloat(row.localOvertimeWageRate) || 0;
-    return sum + otHrs * otRate;
-  }, 0);
-  const otManualTotal = overtimeCashRows.reduce(
-    (sum, row) => sum + (manualCashMap[row.employee.id] || 0),
-    0,
-  );
   const overtimeSection =
     overtimeCashRows.length > 0
       ? `<h3 style="font-size:13px; font-weight:600; color:${co.pdfPrimary}; margin-bottom:8px; margin-top:16px;">Cash Overtime</h3>
@@ -695,16 +651,9 @@ function printCashTransactionsPDF(
         <th style="text-align:center;">OT Hours</th>
         <th style="text-align:center;">OT Wage Rate</th>
         <th style="text-align:center;">OT Total</th>
-        <th style="text-align:center;background:#fffbeb;color:#92400e;">Manual Cash (Rounded)</th>
       </tr>
     </thead>
-    <tbody>${overtimeTableRows}
-      <tr style="font-weight:bold;background:${co.pdfEven};">
-        <td colspan="3" style="text-align:right;">Totals</td>
-        <td style="text-align:center;">£${otCalcTotal.toFixed(2)}</td>
-        <td style="text-align:center;background:#fffbeb;color:#92400e;">£${otManualTotal.toFixed(2)}</td>
-      </tr>
-    </tbody>
+    <tbody>${overtimeTableRows}</tbody>
   </table>`
       : "";
 
@@ -1276,8 +1225,6 @@ interface DashboardProps {
   company: CompanyConfig;
   activeCompany: CompanyId;
   onCompanySwitch: (id: CompanyId) => void;
-  allPeriods: PayPeriod[];
-  loadingAllPeriods: boolean;
 }
 
 function DashboardView({
@@ -1287,8 +1234,6 @@ function DashboardView({
   company,
   activeCompany,
   onCompanySwitch,
-  allPeriods,
-  loadingAllPeriods,
 }: DashboardProps) {
   return (
     <div className="min-h-screen bg-background flex flex-col">
@@ -1484,95 +1429,6 @@ function DashboardView({
           </div>
         )}
 
-        {/* Monthly Labour Cost Chart */}
-        <div className="mb-10 rounded-xl border border-border bg-card shadow-xs overflow-hidden">
-          <div className="px-6 py-4 border-b border-border flex items-center gap-2">
-            <TrendingUp className="h-4 w-4 text-muted-foreground" />
-            <h3 className="text-sm font-semibold uppercase tracking-wider text-muted-foreground">
-              Monthly Labour Cost
-            </h3>
-          </div>
-          <div className="p-6">
-            {loadingAllPeriods ? (
-              <div className="flex items-center justify-center h-[300px]">
-                <Loader2 className="h-6 w-6 animate-spin text-muted-foreground" />
-              </div>
-            ) : allPeriods.length === 0 ? (
-              <div className="flex flex-col items-center justify-center h-[300px] text-muted-foreground gap-2">
-                <TrendingUp className="h-10 w-10 opacity-20" />
-                <p className="text-sm font-medium">No pay periods saved yet</p>
-                <p className="text-xs">
-                  Save a pay period to see labour cost trends
-                </p>
-              </div>
-            ) : (
-              <>
-                <ResponsiveContainer width="100%" height={300}>
-                  <BarChart
-                    data={[...allPeriods]
-                      .sort((a, b) => a.startDate.localeCompare(b.startDate))
-                      .map((p) => ({
-                        name: p.startDate
-                          ? `${p.startDate.slice(5, 7)}/${p.startDate.slice(2, 4)}`
-                          : p._label.slice(0, 5),
-                        grandTotal: p.grandTotal,
-                        wages: p.totalWages,
-                        tips: p.totalTips,
-                      }))}
-                    margin={{ top: 5, right: 20, left: 10, bottom: 5 }}
-                  >
-                    <CartesianGrid
-                      strokeDasharray="3 3"
-                      stroke="rgba(0,0,0,0.06)"
-                    />
-                    <XAxis dataKey="name" tick={{ fontSize: 11 }} />
-                    <YAxis
-                      tickFormatter={(v) => `£${v}`}
-                      tick={{ fontSize: 11 }}
-                    />
-                    <RechartsTooltip
-                      formatter={(value: number) => [
-                        `£${value.toFixed(2)}`,
-                        undefined,
-                      ]}
-                    />
-                    <Bar
-                      dataKey="grandTotal"
-                      name="Grand Total"
-                      fill={company.primary}
-                      radius={[3, 3, 0, 0]}
-                    />
-                    <Bar
-                      dataKey="wages"
-                      name="Wages"
-                      fill={company.accent}
-                      radius={[3, 3, 0, 0]}
-                    />
-                  </BarChart>
-                </ResponsiveContainer>
-                <div className="flex items-center justify-center gap-6 mt-3">
-                  <div className="flex items-center gap-1.5">
-                    <div
-                      className="w-3 h-3 rounded-sm"
-                      style={{ backgroundColor: company.primary }}
-                    />
-                    <span className="text-xs text-muted-foreground">
-                      Grand Total
-                    </span>
-                  </div>
-                  <div className="flex items-center gap-1.5">
-                    <div
-                      className="w-3 h-3 rounded-sm"
-                      style={{ backgroundColor: company.accent }}
-                    />
-                    <span className="text-xs text-muted-foreground">Wages</span>
-                  </div>
-                </div>
-              </>
-            )}
-          </div>
-        </div>
-
         {/* CTA */}
         <div className="flex justify-center">
           <Button
@@ -1646,30 +1502,14 @@ export default function App() {
   const [latestPeriod, setLatestPeriod] = useState<PayPeriod | null>(null);
   const [loadingPeriod, setLoadingPeriod] = useState(true);
 
-  const [allPeriods, setAllPeriods] = useState<PayPeriod[]>([]);
-  const [loadingAllPeriods, setLoadingAllPeriods] = useState(true);
-  const [savingPeriod, setSavingPeriod] = useState(false);
-
   // Payroll rows
   const [rows, setRows] = useState<PayrollRow[]>([]);
   const [loading, setLoading] = useState(true);
   const [loadError, setLoadError] = useState<string | null>(null);
 
   // Date range for current pay period
-  const [periodStart, setPeriodStart] = useState(() => {
-    try {
-      return localStorage.getItem("payroll_period_start_bezendi") || "";
-    } catch {
-      return "";
-    }
-  });
-  const [periodEnd, setPeriodEnd] = useState(() => {
-    try {
-      return localStorage.getItem("payroll_period_end_bezendi") || "";
-    } catch {
-      return "";
-    }
-  });
+  const [periodStart, setPeriodStart] = useState("");
+  const [periodEnd, setPeriodEnd] = useState("");
 
   // Sort state
   const [sortAlpha, setSortAlpha] = useState(false);
@@ -1701,13 +1541,8 @@ export default function App() {
     setActiveCompany(id);
     setRows([]);
     setLatestPeriod(null);
-    try {
-      setPeriodStart(localStorage.getItem(`payroll_period_start_${id}`) || "");
-      setPeriodEnd(localStorage.getItem(`payroll_period_end_${id}`) || "");
-    } catch {
-      setPeriodStart("");
-      setPeriodEnd("");
-    }
+    setPeriodStart("");
+    setPeriodEnd("");
   }
 
   // ── Load data ──────────────────────────────
@@ -1767,15 +1602,6 @@ export default function App() {
           }
         }
 
-        // Also load all periods for the chart
-        try {
-          const periodsResult = await actor.listPayPeriods(activeCompany);
-          setAllPeriods(periodsResult);
-          setLoadingAllPeriods(false);
-        } catch (_) {
-          setLoadingAllPeriods(false);
-        }
-
         const newRows: PayrollRow[] = employees.map((emp) => {
           const entry = entryMap.get(emp.id) || null;
           return {
@@ -1797,7 +1623,6 @@ export default function App() {
             overtimePaymentMethod:
               (entry?.overtimePaymentMethod as "cash" | "bank") || "bank",
             includeInAccountantPDF: true,
-            localManualCash: "",
             saving: false,
             savedAt: null,
           };
@@ -1839,7 +1664,6 @@ export default function App() {
         cached.rows.map((r: PayrollRow) => ({
           ...r,
           includeInAccountantPDF: r.includeInAccountantPDF ?? true,
-          localManualCash: r.localManualCash ?? "",
         })),
       );
       setLatestPeriod(cached.period);
@@ -1860,67 +1684,6 @@ export default function App() {
       loadData();
     }
   }, [actor, actorFetching, loadData]);
-
-  // ── Persist period dates to localStorage ──
-
-  useEffect(() => {
-    try {
-      localStorage.setItem(
-        `payroll_period_start_${activeCompany}`,
-        periodStart,
-      );
-      localStorage.setItem(`payroll_period_end_${activeCompany}`, periodEnd);
-    } catch (_) {}
-  }, [periodStart, periodEnd, activeCompany]);
-
-  // ── Manual cash change handler ─────────────
-
-  function handleManualCashChange(employeeId: string, value: string) {
-    setRows((prev) =>
-      prev.map((r) =>
-        r.employee.id === employeeId ? { ...r, localManualCash: value } : r,
-      ),
-    );
-  }
-
-  // ── Save Period ────────────────────────────
-
-  async function handleSavePeriod() {
-    if (!actor || !periodStart || !periodEnd) {
-      toast.error("Please set a pay period date range first");
-      return;
-    }
-    setSavingPeriod(true);
-    try {
-      await actor.savePayPeriod(
-        activeCompany,
-        crypto.randomUUID(),
-        periodStart,
-        periodEnd,
-        formatPeriodLabel(periodStart, periodEnd),
-        computedTotalWages,
-        computedTotalTips,
-        computedTotalOvertime,
-        computedGrandTotal,
-        computedCashTotal,
-        BigInt(rows.length),
-      );
-      const [newPeriod, newAllPeriods] = await Promise.all([
-        actor.getLatestPayPeriod(activeCompany),
-        actor.listPayPeriods(activeCompany),
-      ]);
-      setLatestPeriod(
-        Array.isArray(newPeriod) ? (newPeriod[0] ?? null) : (newPeriod ?? null),
-      );
-      setAllPeriods(newAllPeriods);
-      toast.success("Pay period saved to cloud");
-    } catch (err) {
-      console.error("Save period failed:", err);
-      toast.error("Failed to save pay period. Please try again.");
-    } finally {
-      setSavingPeriod(false);
-    }
-  }
 
   // ── Sorted rows ────────────────────────────
 
@@ -2242,7 +2005,6 @@ export default function App() {
             paymentMethod: "bank",
             overtimePaymentMethod: "bank",
             includeInAccountantPDF: true,
-            localManualCash: "",
             saving: false,
             savedAt: null,
           },
@@ -2485,8 +2247,6 @@ export default function App() {
           company={company}
           activeCompany={activeCompany}
           onCompanySwitch={handleCompanySwitch}
-          allPeriods={allPeriods}
-          loadingAllPeriods={loadingAllPeriods}
         />
       </>
     );
@@ -2655,26 +2415,6 @@ export default function App() {
                 size="sm"
                 className="gap-1.5 min-h-[44px]"
                 style={{
-                  backgroundColor: "rgba(255,255,255,0.15)",
-                  color: company.primaryFg,
-                  borderColor: "rgba(255,255,255,0.35)",
-                }}
-                onClick={handleSavePeriod}
-                disabled={savingPeriod || !periodStart || !periodEnd}
-                data-ocid="payroll.save_period.button"
-              >
-                {savingPeriod ? (
-                  <Loader2 className="h-4 w-4 animate-spin" />
-                ) : (
-                  <CheckCircle2 className="h-4 w-4" />
-                )}
-                {savingPeriod ? "Saving…" : "Save Period"}
-              </Button>
-              <Button
-                variant="outline"
-                size="sm"
-                className="gap-1.5 min-h-[44px]"
-                style={{
                   backgroundColor: "rgba(255,255,255,0.1)",
                   color: company.primaryFg,
                   borderColor: "rgba(255,255,255,0.25)",
@@ -2752,20 +2492,14 @@ export default function App() {
                   color: company.primaryFg,
                   borderColor: "rgba(255,255,255,0.25)",
                 }}
-                onClick={() => {
-                  const manualCashMap: Record<string, number> = {};
-                  for (const r of displayRows) {
-                    manualCashMap[r.employee.id] =
-                      Number.parseFloat(r.localManualCash) || 0;
-                  }
+                onClick={() =>
                   printCashTransactionsPDF(
                     displayRows,
                     periodStart,
                     periodEnd,
                     company,
-                    manualCashMap,
-                  );
-                }}
+                  )
+                }
               >
                 <Banknote className="h-4 w-4" />
                 Cash PDF
@@ -2911,9 +2645,6 @@ export default function App() {
                   <TableHead className="w-[130px] text-right font-semibold text-foreground">
                     Total Wages
                   </TableHead>
-                  <TableHead className="w-[120px] text-right font-semibold text-foreground bg-amber-50/50">
-                    Manual £
-                  </TableHead>
                   <TableHead className="w-[120px] text-right font-semibold text-foreground">
                     Tips Earned
                   </TableHead>
@@ -2937,7 +2668,6 @@ export default function App() {
                         "c7",
                         "c8",
                         "c9",
-                        "c10",
                       ].map((cKey) => (
                         <TableCell key={cKey}>
                           <Skeleton className="h-9 w-full" />
@@ -2947,7 +2677,7 @@ export default function App() {
                   ))
                 ) : rows.length === 0 ? (
                   <TableRow>
-                    <TableCell colSpan={11} className="py-16 text-center">
+                    <TableCell colSpan={10} className="py-16 text-center">
                       <div className="flex flex-col items-center gap-3 text-muted-foreground">
                         <Users className="h-10 w-10 opacity-30" />
                         <div>
@@ -3158,35 +2888,6 @@ export default function App() {
                             )}
                           </TableCell>
 
-                          {/* Manual Cash */}
-                          <TableCell className="text-right bg-amber-50/30">
-                            <div className="relative flex items-center justify-end">
-                              <span className="absolute left-2 text-amber-500 text-xs pointer-events-none">
-                                £
-                              </span>
-                              <input
-                                type="number"
-                                className="table-input text-amber-900"
-                                style={{
-                                  fontSize: "16px",
-                                  backgroundColor: "rgb(255 251 235 / 0.8)",
-                                  borderColor: "rgb(252 211 77 / 0.5)",
-                                }}
-                                min="0"
-                                step="1"
-                                value={row.localManualCash}
-                                onChange={(e) =>
-                                  handleManualCashChange(
-                                    row.employee.id,
-                                    e.target.value,
-                                  )
-                                }
-                                placeholder="0"
-                                aria-label={`Manual cash for ${row.employee.name}`}
-                              />
-                            </div>
-                          </TableCell>
-
                           {/* Tips Earned */}
                           <TableCell className="text-right">
                             <div className="relative flex items-center justify-end">
@@ -3327,8 +3028,6 @@ export default function App() {
                                 {formatCurrency(overtimeTotal)}
                               </span>
                             </TableCell>
-                            {/* Empty manual cash cell */}
-                            <TableCell className="py-2" />
                             {/* Empty tips cell */}
                             <TableCell className="py-2" />
                             {/* Empty actions cell */}
