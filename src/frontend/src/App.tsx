@@ -259,6 +259,25 @@ function printAccountantPDF(
     th { background: ${co.pdfPrimary}; color: ${co.primaryFg}; font-weight: 600; font-size: 11px; text-transform: uppercase; letter-spacing: 0.06em; }
     tr:nth-child(even) td { background: ${co.pdfEven}; }
     .footer { margin-top: 32px; font-size: 10px; color: ${co.accent}; text-align: center; border-top: 1px solid ${co.pdfBorder}; padding-top: 12px; }
+  
+    @media print { .pdf-toolbar { display: none !important; } }
+    .pdf-toolbar {
+      position: fixed; top: 0; left: 0; right: 0; z-index: 9999;
+      background: #1a1a2e; color: #fff;
+      display: flex; align-items: center; gap: 10px;
+      padding: 10px 18px; box-shadow: 0 2px 8px rgba(0,0,0,0.3);
+      font-family: Arial, sans-serif;
+    }
+    .pdf-toolbar .tb-title { flex: 1; font-size: 14px; font-weight: 600; opacity: 0.85; }
+    .pdf-toolbar button {
+      border: none; border-radius: 6px; padding: 8px 18px;
+      font-size: 14px; font-weight: 600; cursor: pointer; min-width: 80px;
+    }
+    .btn-close { background: #e74c3c; color: #fff; }
+    .btn-share { background: #27ae60; color: #fff; }
+    .btn-print { background: #2980b9; color: #fff; }
+    .pdf-toolbar button:hover { opacity: 0.88; }
+    body { padding-top: 56px; }
   </style>
 </head>
 <body>
@@ -279,7 +298,23 @@ function printAccountantPDF(
     </tbody>
   </table>
   <div class="footer">${co.name} Wages Management — Confidential</div>
-  <script>window.onafterprint = function() { window.close(); };</script>
+  <div class="pdf-toolbar">
+    <span class="tb-title">Review your document</span>
+    <button class="btn-close" onclick="window.close()">&#x2715; Close</button>
+    <button class="btn-share" onclick="shareDoc()">&#x2197; Share</button>
+    <button class="btn-print" onclick="window.print()">&#128424; Print / Save PDF</button>
+  </div>
+  <script>
+    function shareDoc() {
+      if (navigator.share) {
+        navigator.share({ title: document.title, text: 'Payroll document: ' + document.title })
+          .catch(function() {});
+      } else {
+        window.print();
+      }
+    }
+    window.onafterprint = function() { window.close(); };
+  </script>
 </body>
 </html>`;
 
@@ -291,8 +326,7 @@ function printAccountantPDF(
   win.document.write(html);
   win.document.close();
   win.focus();
-  win.onafterprint = () => win.close();
-  setTimeout(() => win.print(), 500);
+  // User will choose to print/share/close via toolbar
 }
 
 function printFullSummaryPDF(
@@ -399,6 +433,25 @@ function printFullSummaryPDF(
     .summary-value { font-size: 15px; font-weight: bold; color: #1a1008; }
     .summary-item:last-child .summary-value { color: ${co.pdfPrimary}; }
     .footer { margin-top: 24px; font-size: 10px; color: ${co.accent}; text-align: center; border-top: 1px solid ${co.pdfBorder}; padding-top: 12px; }
+  
+    @media print { .pdf-toolbar { display: none !important; } }
+    .pdf-toolbar {
+      position: fixed; top: 0; left: 0; right: 0; z-index: 9999;
+      background: #1a1a2e; color: #fff;
+      display: flex; align-items: center; gap: 10px;
+      padding: 10px 18px; box-shadow: 0 2px 8px rgba(0,0,0,0.3);
+      font-family: Arial, sans-serif;
+    }
+    .pdf-toolbar .tb-title { flex: 1; font-size: 14px; font-weight: 600; opacity: 0.85; }
+    .pdf-toolbar button {
+      border: none; border-radius: 6px; padding: 8px 18px;
+      font-size: 14px; font-weight: 600; cursor: pointer; min-width: 80px;
+    }
+    .btn-close { background: #e74c3c; color: #fff; }
+    .btn-share { background: #27ae60; color: #fff; }
+    .btn-print { background: #2980b9; color: #fff; }
+    .pdf-toolbar button:hover { opacity: 0.88; }
+    body { padding-top: 56px; }
   </style>
 </head>
 <body>
@@ -450,7 +503,23 @@ function printFullSummaryPDF(
     </div>
   </div>
   <div class="footer">${co.name} Wages Management — Confidential</div>
-  <script>window.onafterprint = function() { window.close(); };</script>
+  <div class="pdf-toolbar">
+    <span class="tb-title">Review your document</span>
+    <button class="btn-close" onclick="window.close()">&#x2715; Close</button>
+    <button class="btn-share" onclick="shareDoc()">&#x2197; Share</button>
+    <button class="btn-print" onclick="window.print()">&#128424; Print / Save PDF</button>
+  </div>
+  <script>
+    function shareDoc() {
+      if (navigator.share) {
+        navigator.share({ title: document.title, text: 'Payroll document: ' + document.title })
+          .catch(function() {});
+      } else {
+        window.print();
+      }
+    }
+    window.onafterprint = function() { window.close(); };
+  </script>
 </body>
 </html>`;
 
@@ -462,8 +531,7 @@ function printFullSummaryPDF(
   win.document.write(html);
   win.document.close();
   win.focus();
-  win.onafterprint = () => win.close();
-  setTimeout(() => win.print(), 500);
+  // User will choose to print/share/close via toolbar
 }
 
 // ─────────────────────────────────────────────
@@ -521,6 +589,25 @@ function printTipsPDF(
     th { background: ${co.pdfPrimary}; color: ${co.primaryFg}; font-size: 10px; text-transform: uppercase; letter-spacing: 0.06em; }
     tr:nth-child(even) td { background: ${co.pdfEven}; }
     .footer { margin-top: 24px; font-size: 10px; color: ${co.accent}; text-align: center; border-top: 1px solid ${co.pdfBorder}; padding-top: 12px; }
+  
+    @media print { .pdf-toolbar { display: none !important; } }
+    .pdf-toolbar {
+      position: fixed; top: 0; left: 0; right: 0; z-index: 9999;
+      background: #1a1a2e; color: #fff;
+      display: flex; align-items: center; gap: 10px;
+      padding: 10px 18px; box-shadow: 0 2px 8px rgba(0,0,0,0.3);
+      font-family: Arial, sans-serif;
+    }
+    .pdf-toolbar .tb-title { flex: 1; font-size: 14px; font-weight: 600; opacity: 0.85; }
+    .pdf-toolbar button {
+      border: none; border-radius: 6px; padding: 8px 18px;
+      font-size: 14px; font-weight: 600; cursor: pointer; min-width: 80px;
+    }
+    .btn-close { background: #e74c3c; color: #fff; }
+    .btn-share { background: #27ae60; color: #fff; }
+    .btn-print { background: #2980b9; color: #fff; }
+    .pdf-toolbar button:hover { opacity: 0.88; }
+    body { padding-top: 56px; }
   </style>
 </head>
 <body>
@@ -541,7 +628,23 @@ function printTipsPDF(
     </tbody>
   </table>
   <div class="footer">${co.name} Wages Management — Confidential</div>
-  <script>window.onafterprint = function() { window.close(); };</script>
+  <div class="pdf-toolbar">
+    <span class="tb-title">Review your document</span>
+    <button class="btn-close" onclick="window.close()">&#x2715; Close</button>
+    <button class="btn-share" onclick="shareDoc()">&#x2197; Share</button>
+    <button class="btn-print" onclick="window.print()">&#128424; Print / Save PDF</button>
+  </div>
+  <script>
+    function shareDoc() {
+      if (navigator.share) {
+        navigator.share({ title: document.title, text: 'Payroll document: ' + document.title })
+          .catch(function() {});
+      } else {
+        window.print();
+      }
+    }
+    window.onafterprint = function() { window.close(); };
+  </script>
 </body>
 </html>`;
 
@@ -553,8 +656,7 @@ function printTipsPDF(
   win.document.write(html);
   win.document.close();
   win.focus();
-  win.onafterprint = () => win.close();
-  setTimeout(() => win.print(), 500);
+  // User will choose to print/share/close via toolbar
 }
 
 function printCashTransactionsPDF(
@@ -729,6 +831,25 @@ function printCashTransactionsPDF(
     th { background: ${co.pdfPrimary}; color: ${co.primaryFg}; font-size: 10px; text-transform: uppercase; letter-spacing: 0.06em; }
     tr:nth-child(even) td { background: ${co.pdfEven}; }
     .footer { margin-top: 24px; font-size: 10px; color: ${co.accent}; text-align: center; border-top: 1px solid ${co.pdfBorder}; padding-top: 12px; }
+  
+    @media print { .pdf-toolbar { display: none !important; } }
+    .pdf-toolbar {
+      position: fixed; top: 0; left: 0; right: 0; z-index: 9999;
+      background: #1a1a2e; color: #fff;
+      display: flex; align-items: center; gap: 10px;
+      padding: 10px 18px; box-shadow: 0 2px 8px rgba(0,0,0,0.3);
+      font-family: Arial, sans-serif;
+    }
+    .pdf-toolbar .tb-title { flex: 1; font-size: 14px; font-weight: 600; opacity: 0.85; }
+    .pdf-toolbar button {
+      border: none; border-radius: 6px; padding: 8px 18px;
+      font-size: 14px; font-weight: 600; cursor: pointer; min-width: 80px;
+    }
+    .btn-close { background: #e74c3c; color: #fff; }
+    .btn-share { background: #27ae60; color: #fff; }
+    .btn-print { background: #2980b9; color: #fff; }
+    .pdf-toolbar button:hover { opacity: 0.88; }
+    body { padding-top: 56px; }
   </style>
 </head>
 <body>
@@ -740,7 +861,23 @@ function printCashTransactionsPDF(
   ${regularSection}
   ${overtimeSection}
   <div class="footer">${co.name} Wages Management — Confidential</div>
-  <script>window.onafterprint = function() { window.close(); };<\/script>
+  <div class="pdf-toolbar">
+    <span class="tb-title">Review your document</span>
+    <button class="btn-close" onclick="window.close()">&#x2715; Close</button>
+    <button class="btn-share" onclick="shareDoc()">&#x2197; Share</button>
+    <button class="btn-print" onclick="window.print()">&#128424; Print / Save PDF</button>
+  </div>
+  <script>
+    function shareDoc() {
+      if (navigator.share) {
+        navigator.share({ title: document.title, text: 'Payroll document: ' + document.title })
+          .catch(function() {});
+      } else {
+        window.print();
+      }
+    }
+    window.onafterprint = function() { window.close(); };
+  </script>
 </body>
 </html>`;
 
@@ -752,8 +889,7 @@ function printCashTransactionsPDF(
   win.document.write(html);
   win.document.close();
   win.focus();
-  win.onafterprint = () => win.close();
-  setTimeout(() => win.print(), 500);
+  // User will choose to print/share/close via toolbar
 }
 
 // ─────────────────────────────────────────────
@@ -1718,9 +1854,37 @@ export default function App() {
 
   const loadData = useCallback(async () => {
     if (!actor) return;
-    setLoading(true);
-    setLoadingPeriod(true);
     setLoadError(null);
+
+    // Show cached data immediately so user sees their data right away
+    const cachedRaw = localStorage.getItem(`payroll_cache_${activeCompany}`);
+    let hasCachedData = false;
+    if (cachedRaw) {
+      try {
+        const cached = JSON.parse(cachedRaw) as {
+          rows: PayrollRow[];
+          period: PayPeriod | null;
+        };
+        if (cached && cached.rows.length > 0) {
+          setRows(
+            cached.rows.map((r: PayrollRow) => ({
+              ...r,
+              includeInAccountantPDF: r.includeInAccountantPDF ?? true,
+              localManualCash: r.localManualCash ?? "",
+            })),
+          );
+          setLatestPeriod(cached.period);
+          hasCachedData = true;
+          setLoading(false);
+          setLoadingPeriod(false);
+        }
+      } catch (_) {}
+    }
+
+    if (!hasCachedData) {
+      setLoading(true);
+      setLoadingPeriod(true);
+    }
 
     const delay = (ms: number) =>
       new Promise<void>((res) => setTimeout(res, ms));
@@ -1831,29 +1995,33 @@ export default function App() {
       }
     }
 
-    // All retries exhausted -- try local cache
+    // All retries exhausted
     console.error("All load attempts failed:", lastErr);
-    let cached: { rows: PayrollRow[]; period: PayPeriod | null } | null = null;
-    try {
-      const raw = localStorage.getItem(`payroll_cache_${activeCompany}`);
-      if (raw) cached = JSON.parse(raw);
-    } catch (_) {}
-    if (cached && cached.rows.length > 0) {
-      setRows(
-        cached.rows.map((r: PayrollRow) => ({
-          ...r,
-          includeInAccountantPDF: r.includeInAccountantPDF ?? true,
-          localManualCash: r.localManualCash ?? "",
-        })),
-      );
-      setLatestPeriod(cached.period);
-      setLoadError(
-        "Showing your last saved data (offline). Tap Retry to reconnect.",
-      );
+    if (hasCachedData) {
+      setLoadError("Showing saved data (offline). Tap Retry to reconnect.");
     } else {
-      setLoadError(
-        "Unable to connect to server. Please check your internet connection and tap Retry.",
-      );
+      // Try cache one more time
+      let cached: { rows: PayrollRow[]; period: PayPeriod | null } | null =
+        null;
+      try {
+        const raw = localStorage.getItem(`payroll_cache_${activeCompany}`);
+        if (raw) cached = JSON.parse(raw);
+      } catch (_) {}
+      if (cached && cached.rows.length > 0) {
+        setRows(
+          cached.rows.map((r: PayrollRow) => ({
+            ...r,
+            includeInAccountantPDF: r.includeInAccountantPDF ?? true,
+            localManualCash: r.localManualCash ?? "",
+          })),
+        );
+        setLatestPeriod(cached.period);
+        setLoadError("Showing saved data (offline). Tap Retry to reconnect.");
+      } else {
+        setLoadError(
+          "Unable to connect to server. Please check your internet connection and tap Retry.",
+        );
+      }
     }
     setLoading(false);
     setLoadingPeriod(false);
