@@ -144,6 +144,7 @@ interface PayrollRow {
   overtimePaymentMethod: "cash" | "bank";
   includeInAccountantPDF: boolean;
   localManualCash: string;
+  localManualOt: string;
   saving: boolean;
   savedAt: number | null;
 }
@@ -306,12 +307,7 @@ function printAccountantPDF(
   </div>
   <script>
     function shareDoc() {
-      if (navigator.share) {
-        navigator.share({ title: document.title, text: 'Payroll document: ' + document.title })
-          .catch(function() {});
-      } else {
-        window.print();
-      }
+      window.print();
     }
     window.onafterprint = function() { window.close(); };
   </script>
@@ -340,6 +336,7 @@ function printFullSummaryPDF(
   endDate: string,
   co: CompanyConfig,
   tipsOnly = false,
+  manualOtMap: Record<string, number> = {},
 ) {
   const periodLabel =
     startDate && endDate
@@ -377,6 +374,7 @@ function printFullSummaryPDF(
       const individualTotal = mainAmount + tips + overtimeTotal;
       const paymentDisplay = row.paymentMethod === "cash" ? "Cash" : "Bank";
 
+      const manualOt = manualOtMap[row.employee.id] || 0;
       const overtimeSubRow =
         row.isStudent && overtimeHrs > 0
           ? `<tr style="background:#eff6ff; font-size:11px;">
@@ -385,7 +383,9 @@ function printFullSummaryPDF(
             <td style="text-align:right;"></td>
             <td style="text-align:right;"></td>
             <td style="text-align:right;"></td>
-            <td style="text-align:right; color:#3b82f6;">£${overtimeTotal.toFixed(2)}</td>
+            <td style="text-align:right; color:#3b82f6;">
+              Calc: £${overtimeTotal.toFixed(2)}${manualOt > 0 ? `<br/><span style="color:#92400e;">Manual: £${manualOt.toFixed(2)}</span>` : ""}
+            </td>
             <td style="text-align:center; color:#3b82f6; font-size:10px;">${row.overtimePaymentMethod === "cash" ? "Cash" : "Bank"}</td>
             <td style="text-align:right;"></td>
           </tr>`
@@ -406,6 +406,7 @@ function printFullSummaryPDF(
     })
     .join("");
 
+  const totalManualOt = Object.values(manualOtMap).reduce((s, v) => s + v, 0);
   const html = `<!DOCTYPE html>
 <html lang="en">
 <head>
@@ -426,7 +427,7 @@ function printFullSummaryPDF(
     .fixed-badge { display: inline-block; font-size: 9px; background: #fef3c7; color: #92400e; border-radius: 3px; padding: 1px 4px; margin-left: 4px; font-weight: 600; }
     .summary-box { border: 2px solid ${co.pdfPrimary}; border-radius: 6px; overflow: hidden; }
     .summary-title { background: ${co.pdfPrimary}; color: ${co.primaryFg}; padding: 10px 16px; font-size: 11px; font-weight: bold; text-transform: uppercase; letter-spacing: 0.08em; }
-    .summary-grid { display: grid; grid-template-columns: repeat(5, 1fr); }
+    .summary-grid { display: grid; grid-template-columns: repeat(3, 1fr); }
     .summary-item { padding: 12px 14px; border-right: 1px solid ${co.pdfBorder}; }
     .summary-item:last-child { border-right: none; background: ${co.pdfEven}; }
     .summary-label { font-size: 10px; color: ${co.accent}; text-transform: uppercase; letter-spacing: 0.05em; margin-bottom: 4px; }
@@ -489,8 +490,12 @@ function printFullSummaryPDF(
         <div class="summary-value">£${totalTips.toFixed(2)}</div>
       </div>
       <div class="summary-item">
-        <div class="summary-label">Overtime Total</div>
+        <div class="summary-label">Calc. Overtime</div>
         <div class="summary-value">£${totalOvertime.toFixed(2)}</div>
+      </div>
+      <div class="summary-item" style="background:#fffbeb;">
+        <div class="summary-label" style="color:#92400e;">Manual Overtime</div>
+        <div class="summary-value" style="color:#92400e;">£${totalManualOt.toFixed(2)}</div>
       </div>
       <div class="summary-item">
         <div class="summary-label">Cash Total</div>
@@ -511,12 +516,7 @@ function printFullSummaryPDF(
   </div>
   <script>
     function shareDoc() {
-      if (navigator.share) {
-        navigator.share({ title: document.title, text: 'Payroll document: ' + document.title })
-          .catch(function() {});
-      } else {
-        window.print();
-      }
+      window.print();
     }
     window.onafterprint = function() { window.close(); };
   </script>
@@ -636,12 +636,7 @@ function printTipsPDF(
   </div>
   <script>
     function shareDoc() {
-      if (navigator.share) {
-        navigator.share({ title: document.title, text: 'Payroll document: ' + document.title })
-          .catch(function() {});
-      } else {
-        window.print();
-      }
+      window.print();
     }
     window.onafterprint = function() { window.close(); };
   </script>
@@ -665,6 +660,7 @@ function printCashTransactionsPDF(
   endDate: string,
   co: CompanyConfig,
   manualCashMap: Record<string, number> = {},
+  manualOtMap: Record<string, number> = {},
 ) {
   const regularCashRows = rows
     .filter((row) => row.paymentMethod === "cash")
@@ -734,7 +730,7 @@ function printCashTransactionsPDF(
       const otHrs = Number.parseFloat(row.localOvertimeHours) || 0;
       const otRate = Number.parseFloat(row.localOvertimeWageRate) || 0;
       const otTotal = otHrs * otRate;
-      const otManualCash = manualCashMap[row.employee.id] || 0;
+      const otManualCash = manualOtMap[row.employee.id] || 0;
       const otManualDisplay =
         otManualCash > 0 ? `£${otManualCash.toFixed(2)}` : "-";
       return `
@@ -787,7 +783,7 @@ function printCashTransactionsPDF(
     return sum + otHrs * otRate;
   }, 0);
   const otManualTotal = overtimeCashRows.reduce(
-    (sum, row) => sum + (manualCashMap[row.employee.id] || 0),
+    (sum, row) => sum + (manualOtMap[row.employee.id] || 0),
     0,
   );
   const overtimeSection =
@@ -869,12 +865,7 @@ function printCashTransactionsPDF(
   </div>
   <script>
     function shareDoc() {
-      if (navigator.share) {
-        navigator.share({ title: document.title, text: 'Payroll document: ' + document.title })
-          .catch(function() {});
-      } else {
-        window.print();
-      }
+      window.print();
     }
     window.onafterprint = function() { window.close(); };
   </script>
@@ -1871,6 +1862,7 @@ export default function App() {
               ...r,
               includeInAccountantPDF: r.includeInAccountantPDF ?? true,
               localManualCash: r.localManualCash ?? "",
+              localManualOt: r.localManualOt ?? "",
             })),
           );
           setLatestPeriod(cached.period);
@@ -1966,6 +1958,7 @@ export default function App() {
               (entry?.overtimePaymentMethod as "cash" | "bank") || "bank",
             includeInAccountantPDF: true,
             localManualCash: "",
+            localManualOt: "",
             saving: false,
             savedAt: null,
           };
@@ -2013,6 +2006,7 @@ export default function App() {
             ...r,
             includeInAccountantPDF: r.includeInAccountantPDF ?? true,
             localManualCash: r.localManualCash ?? "",
+            localManualOt: r.localManualOt ?? "",
           })),
         );
         setLatestPeriod(cached.period);
@@ -2051,6 +2045,14 @@ export default function App() {
     setRows((prev) =>
       prev.map((r) =>
         r.employee.id === employeeId ? { ...r, localManualCash: value } : r,
+      ),
+    );
+  }
+
+  function handleManualOtChange(employeeId: string, value: string) {
+    setRows((prev) =>
+      prev.map((r) =>
+        r.employee.id === employeeId ? { ...r, localManualOt: value } : r,
       ),
     );
   }
@@ -2415,6 +2417,7 @@ export default function App() {
             overtimePaymentMethod: "bank",
             includeInAccountantPDF: true,
             localManualCash: "",
+            localManualOt: "",
             saving: false,
             savedAt: null,
           },
@@ -2872,7 +2875,12 @@ export default function App() {
                   color: company.primaryFg,
                   borderColor: "rgba(255,255,255,0.25)",
                 }}
-                onClick={() =>
+                onClick={() => {
+                  const manualOtMap: Record<string, number> = {};
+                  for (const r of displayRows) {
+                    manualOtMap[r.employee.id] =
+                      Number.parseFloat(r.localManualOt) || 0;
+                  }
                   printFullSummaryPDF(
                     displayRows,
                     computedTotalWages,
@@ -2883,8 +2891,10 @@ export default function App() {
                     periodStart,
                     periodEnd,
                     company,
-                  )
-                }
+                    false,
+                    manualOtMap,
+                  );
+                }}
               >
                 <FileText className="h-4 w-4" />
                 Full Summary PDF
@@ -2926,9 +2936,12 @@ export default function App() {
                 }}
                 onClick={() => {
                   const manualCashMap: Record<string, number> = {};
+                  const manualOtMapCash: Record<string, number> = {};
                   for (const r of displayRows) {
                     manualCashMap[r.employee.id] =
                       Number.parseFloat(r.localManualCash) || 0;
+                    manualOtMapCash[r.employee.id] =
+                      Number.parseFloat(r.localManualOt) || 0;
                   }
                   printCashTransactionsPDF(
                     displayRows,
@@ -2936,6 +2949,7 @@ export default function App() {
                     periodEnd,
                     company,
                     manualCashMap,
+                    manualOtMapCash,
                   );
                 }}
               >
@@ -3499,8 +3513,34 @@ export default function App() {
                                 {formatCurrency(overtimeTotal)}
                               </span>
                             </TableCell>
-                            {/* Empty manual cash cell */}
-                            <TableCell className="py-2" />
+                            {/* Manual OT override */}
+                            <TableCell className="py-2 text-right">
+                              <div className="relative flex items-center justify-end">
+                                <span className="absolute left-2 text-blue-400 text-xs pointer-events-none">
+                                  £
+                                </span>
+                                <input
+                                  type="number"
+                                  className="table-input text-blue-700"
+                                  style={{
+                                    fontSize: "16px",
+                                    backgroundColor: "rgb(239 246 255 / 0.8)",
+                                    borderColor: "rgb(147 197 253 / 0.5)",
+                                  }}
+                                  min="0"
+                                  step="1"
+                                  value={row.localManualOt}
+                                  onChange={(e) =>
+                                    handleManualOtChange(
+                                      row.employee.id,
+                                      e.target.value,
+                                    )
+                                  }
+                                  placeholder="Manual"
+                                  aria-label={`Manual overtime for ${row.employee.name}`}
+                                />
+                              </div>
+                            </TableCell>
                             {/* Empty tips cell */}
                             <TableCell className="py-2" />
                             {/* Empty actions cell */}
